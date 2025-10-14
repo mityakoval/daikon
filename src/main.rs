@@ -1,7 +1,5 @@
-#![allow(unused_imports)]
-
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
+use codecrafters_redis::handle_connection;
 
 #[tokio::main]
 async fn main() {
@@ -11,7 +9,7 @@ async fn main() {
         match stream {
             Ok(stream) => {
                 // Reading a stream might block the thread
-                tokio::task::spawn_blocking(move || handle_connection(stream));
+                tokio::task::spawn_blocking(move || handle_connection(&stream));
             }
             Err(e) => {
                 eprintln!("Error obtaining stream: {}", e)
@@ -19,24 +17,3 @@ async fn main() {
         }
     }
 }
-
-fn handle_connection(mut stream: TcpStream) {
-    let mut buf = [0; 512];
-    loop {
-        match stream.read(&mut buf) {
-            Ok(size) => {
-                if size == 0 {
-                    break;
-                }
-
-                stream.write_all(b"+PONG\r\n").unwrap()
-            }
-            Err(e) => {
-                eprintln!("Error reading stream: {}", e)
-            }
-        }
-    }
-}
-
-// fn parse_command(string: String) -> Commands {
-// }
