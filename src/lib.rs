@@ -14,14 +14,18 @@ impl Command<'_> {
     fn respond(&mut self, mut stream: &TcpStream) {
         match self {
             Command::PING => stream.write_all(b"+PONG\r\n").unwrap(),
-            Command::ECHO(arg) => stream.write_all(arg.encode().as_slice()).unwrap(),
+            Command::ECHO(arg) => {
+                eprintln!("responding to command ECHO with argument {:?}", arg);
+
+                stream.write_all(arg.encode().as_slice()).unwrap()
+            }
         }
     }
 }
 
 trait RESPType {
     fn encode(&mut self) -> Vec<u8>;
-    
+
     fn len(&self) -> usize;
 }
 
@@ -49,11 +53,15 @@ impl<'a> RESPType for Value<'a> {
                 encoded
             }
             Value::SimpleString(value) => value.as_bytes().to_vec(),
-            Value::BulkString(value) => value.as_bytes().to_vec(),
+            Value::BulkString(value) => {
+                let mut encoded: Vec<u8> = Vec::new();
+                encoded.extend_from_slice(format!("${}\r\n{}\r\n", value.len(), value).as_bytes());
+                encoded
+            },
             Value::Error(msg) => msg.as_bytes().to_vec(),
         }
     }
-    
+
     fn len(&self) -> usize {
         match self {
             Value::Array(values) => { values.len() }

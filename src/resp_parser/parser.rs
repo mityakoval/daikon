@@ -14,8 +14,8 @@ pub fn parse_command(input: &str) -> anyhow::Result<Command<'_ >> {
                     match command_bulk_str {
                         "ECHO" => {
                             let arg = command_array.next().unwrap();
-
-                            Ok(Command::ECHO(command_array.next().unwrap()))
+                            eprintln!("arg: {:?}", arg);
+                            Ok(Command::ECHO(arg))
                         }
                         "PING" => {
                             Ok(Command::PING)
@@ -32,29 +32,37 @@ pub fn parse_command(input: &str) -> anyhow::Result<Command<'_ >> {
 
 pub fn parse_data(input: &str) -> Option<(Value<'_>, &str)> {
     if let Some((chunk, rest)) = input.split_once("\r\n") {
-        eprintln!("parsing chunk: {}, rest: {:?}", chunk, rest.trim());
+        eprintln!("parsing chunk: {}, rest: {}", chunk, rest);
         let mut chars = chunk.chars();
         match chars.next() {
             Some('$') => {
                 // It's a BulkString
-                if let Some(length) = chars.next().unwrap().to_digit(10) {
-                    eprintln!("got bulk string of length: {}", length);
-                    Some((Value::BulkString(&rest[..(length as usize)]), rest))
+                if let Ok(length) = chars.collect::<String>().parse::<usize>()  {
+                    let content = &rest[..(length)];
+                    eprintln!("got bulk string {:?} of length: {}", content, length);
+                    let new_rest = &rest[(length)+2..];
+                    eprintln!("new rest is {}", new_rest);
+                    Some((Value::BulkString(content), new_rest))
                 } else {
                     None
                 }
             }
             Some('*') => {
                 // It's a RESPArray
-                let length = chunk.chars().next().unwrap().len_utf8();
-                let mut array = Vec::with_capacity(length);
-                let mut rest = rest;
-                for i in 0..length {
-                    let (t, new_rest) = parse_data(rest)?;
-                    array.push(t);
-                    rest = new_rest;
+                if let Ok(length) = chars.collect::<String>().parse::<usize>() {
+                    eprintln!("got a resp array of length: {}", length);
+                    let mut array = Vec::with_capacity(length);
+                    let mut rest = rest;
+                    for i in 0..length {
+                        eprintln!("parsing item {}", i);
+                        let (t, new_rest) = parse_data(rest)?;
+                        array.push(t);
+                        rest = new_rest;
+                    }
+                    Some((Value::Array(array), rest))
+                } else {
+                    None
                 }
-                Some((Value::Array(array), rest))
             }
             _ => None,
         }
