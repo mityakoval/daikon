@@ -12,7 +12,7 @@ pub fn parse_command(input: &str) -> anyhow::Result<Command<'_ >> {
                 Value::BulkString(command_bulk_str) => {
                     eprintln!("command: {}", command_bulk_str);
                     match command_bulk_str {
-                        "ECHO" => {
+                        ("ECHO") => {
                             let arg = command_array.next().unwrap();
                             eprintln!("arg: {:?}", arg);
                             Ok(Command::ECHO(arg))

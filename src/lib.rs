@@ -1,5 +1,5 @@
-use std::fmt::Display;
 use crate::resp_parser::parser::parse_command;
+use std::fmt::Display;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 
@@ -13,7 +13,9 @@ enum Command<'a> {
 impl Command<'_> {
     fn respond(&mut self, mut stream: &TcpStream) {
         match self {
-            Command::PING => stream.write_all(b"+PONG\r\n").unwrap(),
+            Command::PING => stream
+                .write_all(Value::SimpleString("PONG").encode().as_slice())
+                .unwrap(),
             Command::ECHO(arg) => {
                 eprintln!("responding to command ECHO with argument {:?}", arg);
 
@@ -25,8 +27,6 @@ impl Command<'_> {
 
 trait RESPType {
     fn encode(&mut self) -> Vec<u8>;
-
-    fn len(&self) -> usize;
 }
 
 #[derive(Debug)]
@@ -34,14 +34,15 @@ enum Value<'a> {
     Array(Vec<Value<'a>>),
     SimpleString(&'a str),
     BulkString(&'a str),
+    NullBulkString(),
     Error(&'a str),
 }
 
 impl<'a> RESPType for Value<'a> {
     fn encode(&mut self) -> Vec<u8> {
+        let mut encoded: Vec<u8> = Vec::new();
         match self {
             Value::Array(array) => {
-                let mut encoded: Vec<u8> = Vec::new();
                 // Prepend with the array length
                 encoded.extend_from_slice(format!("*{}\r\n", array.len()).as_bytes());
 
@@ -49,26 +50,21 @@ impl<'a> RESPType for Value<'a> {
                     .into_iter()
                     .flat_map(|t| t.encode())
                     .for_each(|c| encoded.push(c));
-
-                encoded
             }
-            Value::SimpleString(value) => value.as_bytes().to_vec(),
+            Value::SimpleString(value) => {
+                encoded.extend_from_slice(format!("+{}\r\n", value).as_bytes());
+            }
             Value::BulkString(value) => {
-                let mut encoded: Vec<u8> = Vec::new();
                 encoded.extend_from_slice(format!("${}\r\n{}\r\n", value.len(), value).as_bytes());
-                encoded
-            },
-            Value::Error(msg) => msg.as_bytes().to_vec(),
-        }
-    }
-
-    fn len(&self) -> usize {
-        match self {
-            Value::Array(values) => { values.len() }
-            Value::SimpleString(value) => { value.len() }
-            Value::BulkString(value) => { value.len() }
-            Value::Error(value) => { value.len() }
-        }
+            }
+            Value::NullBulkString() => {
+                encoded.extend_from_slice(b"$-1\r\n");
+            }
+            Value::Error(msg) => {
+                encoded.extend_from_slice(format!("-{}\r\n", msg).as_bytes());
+            }
+        };
+        encoded
     }
 }
 
