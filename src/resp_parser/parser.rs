@@ -1,6 +1,7 @@
-use crate::{Command, RESPType, Value};
+use crate::{Command, Value};
 use anyhow::Error;
 use std::fmt::{Debug, Display, Formatter};
+use bytes::{Buf, Bytes, BytesMut};
 use thiserror::Error;
 
 pub fn parse_command(input: &str) -> anyhow::Result<Command<'_ >> {
@@ -12,7 +13,7 @@ pub fn parse_command(input: &str) -> anyhow::Result<Command<'_ >> {
                 Value::BulkString(command_bulk_str) => {
                     eprintln!("command: {}", command_bulk_str);
                     match command_bulk_str {
-                        ("ECHO") => {
+                        "ECHO" => {
                             let arg = command_array.next().unwrap();
                             eprintln!("arg: {:?}", arg);
                             Ok(Command::ECHO(arg))
@@ -28,6 +29,10 @@ pub fn parse_command(input: &str) -> anyhow::Result<Command<'_ >> {
         },
         _ => Err(Error::msg("Command must be a RESP array")),
     }
+}
+
+pub fn parse_input(input: &BytesMut) -> anyhow::Result<Command<'_>> {
+
 }
 
 pub fn parse_data(input: &str) -> Option<(Value<'_>, &str)> {
@@ -71,9 +76,22 @@ pub fn parse_data(input: &str) -> Option<(Value<'_>, &str)> {
     }
 }
 
+pub fn parse_data_bytes(bytes: &mut BytesMut) -> Option<(Value<'_>, &mut BytesMut)> {
+    match bytes.split_once(|&x| x == 1) {
+        None => {}
+        Some(_) => {}
+    }
+    None
+}
+
+fn split_by_carriage_return(bytes: BytesMut) -> Option<(BytesMut, BytesMut)> {
+    
+}
+
 #[derive(Error, Debug)]
 enum ParseError {
-    UnexpectedInput(),
+    UnexpectedInput,
+    UnknownCommand
 }
 
 impl Display for ParseError {

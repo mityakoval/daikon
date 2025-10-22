@@ -1,4 +1,3 @@
-use std::error::Error;
 use crate::resp_parser::parser::parse_command;
 use bytes::{BufMut, BytesMut};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -69,18 +68,18 @@ impl<'a> RESPType for Value<'a> {
     }
 }
 
-pub async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error + Send + Sync>> {
+pub async fn handle_connection(mut stream: TcpStream) {
     let mut buf = BytesMut::with_capacity(1024);
     loop {
         match stream.read_buf(&mut buf).await {
             Ok(size) => {
                 if size == 0 {
-                    break Ok(());
+                    break;
                 }
 
                 match str::from_utf8(&buf) {
                     Ok(input) => {
-                        let mut command = parse_command(input)?;
+                        let mut command = parse_command(input).unwrap();
                         command.respond(&mut stream).await;
                     }
                     Err(_e) => {}
@@ -88,7 +87,7 @@ pub async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Erro
             }
             Err(e) => {
                 eprintln!("Error reading stream: {}", e);
-                break Err(Box::new(e));
+                break;
             }
         }
     }
