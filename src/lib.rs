@@ -5,16 +5,16 @@ use tokio::net::TcpStream;
 
 mod resp_parser;
 
-enum Command<'a> {
+enum Command<> {
     PING,
-    ECHO(Value<'a>),
+    ECHO(Value<>),
 }
 
-impl Command<'_> {
+impl Command {
     async fn respond(&mut self, stream: &mut TcpStream) {
         match self {
             Command::PING => {
-                stream.write_buf(&mut Value::SimpleString("PONG").encode()).await.expect("Could not send pong");
+                stream.write_buf(&mut Value::SimpleString("PONG".to_string()).encode()).await.expect("Could not send pong");
             },
             Command::ECHO(arg) => {
                 eprintln!("responding to command ECHO with argument {:?}", arg);
@@ -30,15 +30,18 @@ trait RESPType {
 }
 
 #[derive(Debug)]
-enum Value<'a> {
-    Array(Vec<Value<'a>>),
-    SimpleString(&'a str),
-    BulkString(&'a str),
+enum Value {
+    Array(Vec<Value>),
+    SimpleString(String),
+    BulkString(String),
     NullBulkString(),
-    Error(&'a str),
 }
 
-impl<'a> RESPType for Value<'a> {
+struct Error<'a> {
+    msg: &'a str,
+}
+
+impl RESPType for Value {
     fn encode(&mut self) -> BytesMut {
         let mut encoded: BytesMut = BytesMut::new();
         match self {
@@ -60,9 +63,6 @@ impl<'a> RESPType for Value<'a> {
             Value::NullBulkString() => {
                 encoded.extend_from_slice(b"$-1\r\n");
             }
-            Value::Error(msg) => {
-                encoded.extend_from_slice(format!("-{}\r\n", msg).as_bytes());
-            }
         };
         encoded
     }
@@ -77,12 +77,14 @@ pub async fn handle_connection(mut stream: TcpStream) {
                     break;
                 }
 
-                match str::from_utf8(&buf) {
-                    Ok(input) => {
-                        let mut command = parse_command(input).unwrap();
+                match parse_command(&mut buf) {
+                    Ok(mut command) => {
                         command.respond(&mut stream).await;
                     }
-                    Err(_e) => {}
+                    Err(e) => {
+                        eprintln!("Error parsing command: {:#}", e);
+                        stream.write_all("-Unknown command\r\n".as_bytes()).await.expect("Could not send error");
+                    }
                 }
             }
             Err(e) => {
