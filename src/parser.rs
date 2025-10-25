@@ -1,8 +1,9 @@
-use crate::{Command, Value};
 use anyhow::Error;
-use bytes::{Buf, Bytes, BytesMut};
+use bytes::BytesMut;
 use std::fmt::{Debug, Display, Formatter};
 use thiserror::Error;
+use crate::data::commands::{Command, RedisCommand, ECHO, PING, SET};
+use crate::data::types::Value;
 
 pub fn parse_command(input: &mut BytesMut) -> anyhow::Result<Command> {
     match parse_data_bytes(input).unwrap() {
@@ -19,6 +20,11 @@ pub fn parse_command(input: &mut BytesMut) -> anyhow::Result<Command> {
                             Ok(Command::ECHO(arg))
                         }
                         "PING" => Ok(Command::PING),
+                        "SET" => {
+                            let key = command_array.next().unwrap();
+                            let value = command_array.next().unwrap();
+                            Ok(Command::SET(key, value))
+                        }
                         _ => Err(Error::msg("Unknown command")),
                     }
                 }
@@ -28,15 +34,6 @@ pub fn parse_command(input: &mut BytesMut) -> anyhow::Result<Command> {
         _ => Err(Error::msg("Command must be a RESP array")),
     }
 }
-
-// pub fn parse_input(input: &mut BytesMut) -> anyhow::Result<Command> {
-//     match parse_data_bytes(input).unwrap() {
-//         (Value::Array(command_array), _) => {
-//
-//         }
-//         _ => Err(Error::msg("Command must be a RESP array"))
-//     }
-// }
 
 pub fn parse_data_bytes(bytes: &mut BytesMut) -> Option<(Value, BytesMut)> {
     let (chunk, mut rest) = next_resp_chunk(bytes)?;
