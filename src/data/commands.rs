@@ -8,7 +8,7 @@ pub enum Command {
     PING,
     ECHO(Value),
     SET(String, Value),
-    GET(String)
+    GET(String),
 }
 
 pub trait RedisCommand {

@@ -1,11 +1,10 @@
+use crate::data::commands::Command;
+use crate::data::types::Value;
 use anyhow::Error;
 use bytes::BytesMut;
-use std::fmt::{Debug, Display, Formatter};
-use thiserror::Error;
-use crate::data::commands::{Command, RedisCommand, ECHO, PING, SET};
-use crate::data::types::{RESPType, Value};
+use std::fmt::{Debug, Display};
 
-pub fn parse_command(input: &mut BytesMut) -> anyhow::Result<Command> {
+pub(crate) fn parse_command(input: &mut BytesMut) -> anyhow::Result<Command> {
     match parse_data_bytes(input).unwrap() {
         (Value::Array(command_array), _) => {
             eprintln!("command array: {:?}", command_array);
@@ -48,7 +47,7 @@ pub fn parse_command(input: &mut BytesMut) -> anyhow::Result<Command> {
     }
 }
 
-pub fn parse_data_bytes(bytes: &mut BytesMut) -> Option<(Value, BytesMut)> {
+fn parse_data_bytes(bytes: &mut BytesMut) -> Option<(Value, BytesMut)> {
     let (chunk, mut rest) = next_resp_chunk(bytes)?;
     eprintln!("\nparsing chunk: {:?}, rest: {:?}", chunk, rest);
     let mut chars = chunk.iter();
@@ -112,16 +111,4 @@ fn next_resp_chunk(bytes: &mut BytesMut) -> Option<(BytesMut, BytesMut)> {
     }
     eprintln!("no more chunks found");
     None
-}
-
-#[derive(Error, Debug)]
-enum ParseError {
-    UnexpectedInput,
-    UnknownCommand,
-}
-
-impl Display for ParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
-    }
 }
