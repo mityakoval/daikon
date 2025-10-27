@@ -11,6 +11,4 @@ impl Storage {
             storage: DashMap::new(),
         }
     }
-
-    pub fn store(&mut self)
 }

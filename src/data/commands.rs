@@ -7,7 +7,8 @@ use crate::storage::Storage;
 pub enum Command {
     PING,
     ECHO(Value),
-    SET(String, Value)
+    SET(String, Value),
+    GET(String)
 }
 
 pub trait RedisCommand {
@@ -47,18 +48,18 @@ impl Command {
     }
 }
 
-impl RedisCommand for Command {
-    fn execute(&mut self, storage: &mut Storage) -> Result<Option<Value>, Error> {
-        match self {
-            Command::PING => {
-                stream.write_buf(&mut Value::SimpleString("PONG".to_string()).encode()).await.expect("Could not send pong");
-            },
-            Command::ECHO(arg) => {
-                eprintln!("responding to command ECHO with argument {:?}", arg);
-
-                stream.write_buf(&mut arg.encode()).await.expect("Could not send pong");
-            }
-            _ => {}
-        }
-    }
-}
+// impl RedisCommand for Command {
+//     fn execute(&mut self, storage: &mut Storage) -> Result<Option<Value>, Error> {
+//         match self {
+//             Command::PING => {
+//                 stream.write_buf(&mut Value::SimpleString("PONG".to_string()).encode()).await.expect("Could not send pong");
+//             },
+//             Command::ECHO(arg) => {
+//                 eprintln!("responding to command ECHO with argument {:?}", arg);
+//
+//                 stream.write_buf(&mut arg.encode()).await.expect("Could not send pong");
+//             }
+//             _ => {}
+//         }
+//     }
+// }

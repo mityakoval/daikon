@@ -4,6 +4,7 @@ use crate::parser::parse_command;
 use crate::storage::Storage;
 use bytes::BytesMut;
 use std::sync::Arc;
+use dashmap::DashMap;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -11,7 +12,7 @@ pub(crate) mod data;
 pub(crate) mod parser;
 pub mod storage;
 
-pub async fn handle_connection(mut stream: TcpStream, storage: Arc<Storage>) {
+pub async fn handle_connection(mut stream: TcpStream, storage: Arc<DashMap<String, Value>>) {
     let mut buf = BytesMut::with_capacity(1024);
     loop {
         match stream.read_buf(&mut buf).await {
@@ -42,12 +43,16 @@ pub async fn handle_connection(mut stream: TcpStream, storage: Arc<Storage>) {
     }
 }
 
-async fn execute_command(command: Command, storage: &Arc<Storage>) -> anyhow::Result<Value> {
+async fn execute_command(command: Command, storage: &Arc<DashMap<String, Value>>) -> anyhow::Result<Value> {
     match command {
         Command::ECHO(value) => Ok(value),
         Command::PING => { Ok(Value::SimpleString("PONG".into())) }
-        Command::SET(String, Value) => {
-            storage
+        Command::SET(key, value) => {
+            storage.insert(key, value);
+            Ok(Value::SimpleString("OK".into()))
+        }
+        Command::GET(key) => {
+            Ok(storage.get(&key).unwrap().value().clone())
         }
     }
 }

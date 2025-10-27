@@ -3,7 +3,7 @@ use bytes::BytesMut;
 use std::fmt::{Debug, Display, Formatter};
 use thiserror::Error;
 use crate::data::commands::{Command, RedisCommand, ECHO, PING, SET};
-use crate::data::types::Value;
+use crate::data::types::{RESPType, Value};
 
 pub fn parse_command(input: &mut BytesMut) -> anyhow::Result<Command> {
     match parse_data_bytes(input).unwrap() {
@@ -13,7 +13,7 @@ pub fn parse_command(input: &mut BytesMut) -> anyhow::Result<Command> {
             match command_array.next().unwrap() {
                 Value::BulkString(command_bulk_str) => {
                     eprintln!("command: {}", command_bulk_str);
-                    match command_bulk_str.as_str() {
+                    match command_bulk_str.to_uppercase().as_str() {
                         "ECHO" => {
                             let arg = command_array.next().unwrap();
                             eprintln!("arg: {:?}", arg);
@@ -23,7 +23,20 @@ pub fn parse_command(input: &mut BytesMut) -> anyhow::Result<Command> {
                         "SET" => {
                             let key = command_array.next().unwrap();
                             let value = command_array.next().unwrap();
-                            Ok(Command::SET(key, value))
+                            match key {
+                                Value::BulkString(key) => {
+                                    Ok(Command::SET(key, value))
+                                }
+                                _ => Err(Error::msg("Wrong type"))
+                            }
+                        }
+                        "GET" => {
+                            match command_array.next().unwrap() {
+                                Value::BulkString(key) => {
+                                    Ok(Command::GET(key))
+                                }
+                                _ => Err(Error::msg("Wrong type"))
+                            }
                         }
                         _ => Err(Error::msg("Unknown command")),
                     }
