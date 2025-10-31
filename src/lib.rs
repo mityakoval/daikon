@@ -7,6 +7,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use crate::data::types::Value::NullBulkString;
 
 pub(crate) mod data;
 pub(crate) mod parser;
@@ -52,7 +53,10 @@ async fn execute_command(command: Command, storage: &Arc<DashMap<String, Value>>
             Ok(Value::SimpleString("OK".into()))
         }
         Command::GET(key) => {
-            Ok(storage.get(&key).unwrap().value().clone())
+            match storage.get(&key) {
+                Some(entry) => Ok(entry.value().clone()),
+                None => Ok(NullBulkString())
+            }
         }
     }
 }
