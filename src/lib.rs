@@ -1,18 +1,21 @@
-use crate::data::commands::{Command, RedisCommand};
-use crate::data::types::{RESPType, Value};
-use crate::parser::parse_command;
-use crate::storage::Storage;
+use std::alloc::System;
+use std::ops::Add;
+use crate::data::commands::Command;
+use crate::data::types::Value::SimpleString;
+use crate::data::types::{RESPType, StoredValue, Value};
 use bytes::BytesMut;
-use std::sync::Arc;
 use dashmap::DashMap;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use crate::parser::commands::parse_command;
 
 pub(crate) mod data;
 pub(crate) mod parser;
 pub mod storage;
 
-pub async fn handle_connection(mut stream: TcpStream, storage: Arc<DashMap<String, Value>>) {
+pub async fn handle_connection(mut stream: TcpStream, storage: Arc<DashMap<String, StoredValue>>) {
     let mut buf = BytesMut::with_capacity(1024);
     loop {
         match stream.read_buf(&mut buf).await {
@@ -43,16 +46,24 @@ pub async fn handle_connection(mut stream: TcpStream, storage: Arc<DashMap<Strin
     }
 }
 
-async fn execute_command(command: Command, storage: &Arc<DashMap<String, Value>>) -> anyhow::Result<Value> {
+async fn execute_command(command: Command, storage: &Arc<DashMap<String, StoredValue>>) -> anyhow::Result<Value> {
     match command {
         Command::ECHO(value) => Ok(value),
-        Command::PING => { Ok(Value::SimpleString("PONG".into())) }
-        Command::SET(key, value) => {
-            storage.insert(key, value);
-            Ok(Value::SimpleString("OK".into()))
+        Command::PING => { Ok(SimpleString("PONG".into())) }
+        Command::SET {key , value, ttl} => {
+            storage.insert(key, StoredValue {
+                value,
+                expires_at: match ttl {
+                    None => None,
+                    Some(ttl) => {
+                        Some(SystemTime::now().add(ttl))
+                    }
+                }
+            });
+            Ok(SimpleString("OK".into()))
         }
         Command::GET(key) => {
-            Ok(storage.get(&key).unwrap().value().clone())
+            Ok(storage.get(&key).unwrap().value().value.clone())
         }
     }
 }

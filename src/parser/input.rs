@@ -1,53 +1,7 @@
-use crate::data::commands::Command;
-use crate::data::types::Value;
-use anyhow::Error;
 use bytes::BytesMut;
-use std::fmt::{Debug, Display};
+use crate::data::types::Value;
 
-pub(crate) fn parse_command(input: &mut BytesMut) -> anyhow::Result<Command> {
-    match parse_data_bytes(input).unwrap() {
-        (Value::Array(command_array), _) => {
-            eprintln!("command array: {:?}", command_array);
-            let mut command_array = command_array.into_iter();
-            match command_array.next().unwrap() {
-                Value::BulkString(command_bulk_str) => {
-                    eprintln!("command: {}", command_bulk_str);
-                    match command_bulk_str.to_uppercase().as_str() {
-                        "ECHO" => {
-                            let arg = command_array.next().unwrap();
-                            eprintln!("arg: {:?}", arg);
-                            Ok(Command::ECHO(arg))
-                        }
-                        "PING" => Ok(Command::PING),
-                        "SET" => {
-                            let key = command_array.next().unwrap();
-                            let value = command_array.next().unwrap();
-                            match key {
-                                Value::BulkString(key) => {
-                                    Ok(Command::SET(key, value))
-                                }
-                                _ => Err(Error::msg("Wrong type"))
-                            }
-                        }
-                        "GET" => {
-                            match command_array.next().unwrap() {
-                                Value::BulkString(key) => {
-                                    Ok(Command::GET(key))
-                                }
-                                _ => Err(Error::msg("Wrong type"))
-                            }
-                        }
-                        _ => Err(Error::msg("Unknown command")),
-                    }
-                }
-                _ => Err(Error::msg("Command must be a RESP array")),
-            }
-        }
-        _ => Err(Error::msg("Command must be a RESP array")),
-    }
-}
-
-fn parse_data_bytes(bytes: &mut BytesMut) -> Option<(Value, BytesMut)> {
+pub fn parse_data_bytes(bytes: &mut BytesMut) -> Option<(Value, BytesMut)> {
     let (chunk, mut rest) = next_resp_chunk(bytes)?;
     eprintln!("\nparsing chunk: {:?}, rest: {:?}", chunk, rest);
     let mut chars = chunk.iter();
