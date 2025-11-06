@@ -1,15 +1,15 @@
-use std::alloc::System;
-use std::ops::Add;
 use crate::data::commands::Command;
+use crate::data::types::Value::NullBulkString;
 use crate::data::types::Value::SimpleString;
 use crate::data::types::{RESPType, StoredValue, Value};
+use crate::parser::commands::parse_command;
 use bytes::BytesMut;
 use dashmap::DashMap;
+use std::ops::Add;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use crate::parser::commands::parse_command;
 
 pub(crate) mod data;
 pub(crate) mod parser;
@@ -63,7 +63,10 @@ async fn execute_command(command: Command, storage: &Arc<DashMap<String, StoredV
             Ok(SimpleString("OK".into()))
         }
         Command::GET(key) => {
-            Ok(storage.get(&key).unwrap().value().value.clone())
+            match storage.get(&key) {
+                Some(entry) => Ok(entry.value().value.clone()),
+                None => Ok(NullBulkString())
+            }
         }
     }
 }

@@ -54,7 +54,7 @@ fn next_resp_chunk(bytes: &mut BytesMut) -> Option<(BytesMut, BytesMut)> {
     let chunk_sep_start = bytes.iter().position(|&x| x == b'\r')?;
     eprintln!("found potential chunk separator at: {}", chunk_sep_start);
     let next_byte = bytes.get(chunk_sep_start)?;
-    if *next_byte == 13 {
+    if *next_byte == 13 { // that's '\n'
         let chunk = (bytes).split_to(chunk_sep_start);
         eprintln!("chunk is: {:?}", chunk);
         assert_eq!(bytes.get(0), Some(&b'\r'));
