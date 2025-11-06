@@ -10,7 +10,7 @@ pub trait RESPType {
 pub enum Value {
     Array(Vec<Value>),
     SimpleString(String),
-    BulkString(String),
+    BulkString(String), // the contained String is always uppercase after parsing
     NullBulkString(),
 }
 
