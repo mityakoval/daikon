@@ -68,16 +68,21 @@ fn execute_command(
         }
         Command::GET(key) => {
             let now = SystemTime::now();
+            let mut expired = false;
             if let Some(entry)  = storage.get(&key) {
                     if entry.expires_at.map_or(true, |t| t > now) {
                         return Ok(entry.value.clone())
                     } else {
-                        eprintln!("Entry expired");
-                        let (key, value) = storage.remove(&key).unwrap();
-                        eprintln!("Removed {}", key);
+                        expired = true;
                     }
             }
-            eprintln!("No entry found");
+            if expired {
+                eprintln!("Expired value for GET: {}. Removing", key);
+                let (key, value) = storage.remove(&key).unwrap();
+                eprintln!("Removed {}", key)
+            } else {
+                eprintln!("No entry found");
+            }
             Ok(NullBulkString())
         }
     }
