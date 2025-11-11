@@ -58,10 +58,7 @@ fn execute_command(
                 key,
                 StoredValue {
                     value,
-                    expires_at: match ttl {
-                        None => None,
-                        Some(ttl) => Some(SystemTime::now().add(ttl)),
-                    },
+                    expires_at: ttl.map(|dur| SystemTime::now().add(dur)),
                 },
             );
             Ok(SimpleString("OK".into()))
