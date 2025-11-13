@@ -1,3 +1,4 @@
+use std::time::SystemTime;
 use bytes::{BufMut, BytesMut};
 
 
@@ -5,12 +6,17 @@ pub trait RESPType {
     fn encode(&mut self) -> BytesMut;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Array(Vec<Value>),
     SimpleString(String),
     BulkString(String),
     NullBulkString(),
+}
+
+pub struct StoredValue {
+    pub value: Value,
+    pub expires_at: Option<SystemTime>,
 }
 
 impl RESPType for Value {
@@ -39,4 +45,3 @@ impl RESPType for Value {
         encoded
     }
 }
-
