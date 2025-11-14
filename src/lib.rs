@@ -2,7 +2,7 @@ use crate::data::commands::Command;
 use crate::data::types::Value::NullBulkString;
 use crate::data::types::Value::SimpleString;
 use crate::data::types::{RESPType, StoredValue, Value};
-use crate::parser::commands::parse_command;
+use crate::parser::commands::parse_command_array;
 use bytes::BytesMut;
 use dashmap::DashMap;
 use std::ops::Add;
@@ -24,7 +24,7 @@ pub async fn handle_connection(mut stream: TcpStream, storage: Arc<DashMap<Strin
                     break;
                 }
 
-                match parse_command(&mut buf) {
+                match parse_command_array(&mut buf) {
                     Ok(command) => {
                         let result = execute_command(command, &storage).unwrap();
                         respond(&mut stream, result).await;
