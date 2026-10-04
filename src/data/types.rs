@@ -19,6 +19,12 @@ pub struct StoredValue {
     pub expires_at: Option<SystemTime>,
 }
 
+impl StoredValue {
+    pub fn is_expired(&self) -> bool {
+        self.expires_at.map_or(false, |expires_at| expires_at <= SystemTime::now())
+    }
+}
+
 impl RESPType for Value {
     fn encode(&mut self) -> BytesMut {
         let mut encoded: BytesMut = BytesMut::new();
