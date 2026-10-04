@@ -26,8 +26,20 @@ impl FromStr for Command {
 
 pub struct CommandArray {
     pub(crate) command: Command,
-    length: u8,
-    key: Option<String>,
-    value: Option<Value>,
-    ttl: Option<Duration>
+    pub(crate) length: u8,
+    pub(crate) key: Option<String>,
+    pub(crate) value: Option<Value>,
+    pub(crate) ttl: Option<Duration>
+}
+
+impl CommandArray {
+    fn execute(self) {
+        match self.command {
+            Command::PING => {}
+            Command::ECHO => {}
+            Command::SET => {}
+            Command::GET => {}
+            Command::RPUSH => {}
+        }
+    }
 }

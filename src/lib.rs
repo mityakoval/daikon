@@ -1,4 +1,4 @@
-use crate::data::commands::Command;
+use crate::data::commands::{Command, CommandArray};
 use crate::data::types::Value::NullBulkString;
 use crate::data::types::Value::SimpleString;
 use crate::data::types::{RESPType, StoredValue, Value};
@@ -47,31 +47,39 @@ pub async fn handle_connection(mut stream: TcpStream, storage: Arc<DashMap<Strin
 }
 
 fn execute_command(
-    command: Command,
+    command_array: CommandArray,
     storage: &Arc<DashMap<String, StoredValue>>,
 ) -> anyhow::Result<Value> {
-    match command {
-        Command::ECHO(value) => Ok(value),
-        Command::PING => Ok(SimpleString("PONG".into())),
-        Command::SET { key, value, ttl } => {
+    match command_array.command {
+        Command::PING => Ok(command_array.value.unwrap()),
+        Command::ECHO => Ok(command_array.value.unwrap()),
+        Command::SET => {
             storage.insert(
-                key,
+                command_array.key.unwrap(),
                 StoredValue {
-                    value,
-                    expires_at: ttl.map(|dur| SystemTime::now().add(dur)),
+                    value: command_array.value.unwrap(),
+                    expires_at: command_array.ttl.map(|ttl| SystemTime::now().add(ttl)),
                 },
             );
             Ok(SimpleString("OK".into()))
         }
-        Command::GET(key) => {
+        Command::GET => {
+            // let stored_value = storage.get(&command_array.key.unwrap()).unwrap();
+            // if stored_value.is_expired() {
+            //
+            // } else {
+            //     Ok(stored_value.value)
+            // }
+
+            let key = command_array.key.unwrap();
             let now = SystemTime::now();
             let mut expired = false;
-            if let Some(entry)  = storage.get(&key) {
-                    if entry.expires_at.map_or(true, |t| t > now) {
-                        return Ok(entry.value.clone())
-                    } else {
-                        expired = true;
-                    }
+            if let Some(entry) = storage.get(&key) {
+                if entry.expires_at.map_or(true, |t| t > now) {
+                    return Ok(entry.value.clone());
+                } else {
+                    expired = true;
+                }
             }
             if expired {
                 eprintln!("Expired value for GET: {}. Removing", key);
@@ -82,7 +90,42 @@ fn execute_command(
             }
             Ok(NullBulkString())
         }
+        Command::RPUSH => {}
     }
+
+    // match command_array.command {
+    //     Command::ECHO => Ok(command_array.value.unwrap()),
+    //     Command::PING => Ok(SimpleString("PONG".into())),
+    //     Command::SET { key, value, ttl } => {
+    //         storage.insert(
+    //             key,
+    //             StoredValue {
+    //                 value,
+    //                 expires_at: ttl.map(|dur| SystemTime::now().add(dur)),
+    //             },
+    //         );
+    //         Ok(SimpleString("OK".into()))
+    //     }
+    //     Command::GET(key) => {
+    //         let now = SystemTime::now();
+    //         let mut expired = false;
+    //         if let Some(entry)  = storage.get(&key) {
+    //                 if entry.expires_at.map_or(true, |t| t > now) {
+    //                     return Ok(entry.value.clone())
+    //                 } else {
+    //                     expired = true;
+    //                 }
+    //         }
+    //         if expired {
+    //             eprintln!("Expired value for GET: {}. Removing", key);
+    //             let (key, value) = storage.remove(&key).unwrap();
+    //             eprintln!("Removed {}", key)
+    //         } else {
+    //             eprintln!("No entry found");
+    //         }
+    //         Ok(NullBulkString())
+    //     }
+    // }
 }
 
 async fn respond<V>(stream: &mut TcpStream, mut value: V)
