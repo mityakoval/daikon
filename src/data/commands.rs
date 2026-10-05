@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use crate::data::types::Value;
+use std::str::FromStr;
 use std::time::Duration;
 
 pub enum Command {
@@ -29,7 +29,7 @@ pub struct CommandArray {
     pub(crate) length: u8,
     pub(crate) key: Option<String>,
     pub(crate) value: Option<Value>,
-    pub(crate) ttl: Option<Duration>
+    pub(crate) ttl: Option<Duration>,
 }
 
 impl CommandArray {
@@ -43,3 +43,4 @@ impl CommandArray {
         }
     }
 }
+

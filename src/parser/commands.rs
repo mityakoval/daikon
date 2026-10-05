@@ -1,10 +1,9 @@
-use std::cmp::PartialEq;
-use std::str::FromStr;
 use crate::data::commands::{Command, CommandArray};
 use crate::data::types::Value;
 use crate::parser::input::parse_data_bytes;
 use anyhow::{anyhow, Error};
 use bytes::BytesMut;
+use std::str::FromStr;
 use std::time::Duration;
 use std::vec::IntoIter;
 
@@ -16,14 +15,13 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
             let command: Command;
 
             if let Some(Value::BulkString(command_bulk_str)) = command_array.next() {
-                command = Command::from_str(command_bulk_str.to_uppercase().as_str()).or_else(|_| Err(anyhow!("Error parsing command bulk string")))?;
+                command = Command::from_str(command_bulk_str.to_uppercase().as_str())
+                    .or_else(|_| Err(anyhow!("Error parsing command bulk string")))?;
                 let mut key = None;
                 let mut value = None;
                 let mut ttl = None;
                 match command {
-                    Command::PING => {
-                        value = Some(Value::SimpleString("PONG".into()))
-                    }
+                    Command::PING => value = Some(Value::SimpleString("PONG".into())),
 
                     Command::ECHO => {
                         value = Some(Value::SimpleString(parse_key(command_array)?.0));
@@ -41,7 +39,7 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                         let (_key, _) = parse_key(command_array)?;
                         key = Some(_key);
                     }
-                    
+
                     Command::RPUSH => {}
                 }
                 Ok(CommandArray {
@@ -49,7 +47,7 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                     length: 1,
                     key,
                     value,
-                    ttl
+                    ttl,
                 })
             } else {
                 Err(anyhow!("command array empty or malformed"))
@@ -61,26 +59,28 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
 
 fn parse_key(mut command_array: IntoIter<Value>) -> anyhow::Result<(String, IntoIter<Value>)> {
     match command_array.next() {
-       Some(Value::BulkString(key)) => Ok((key, command_array)),
+        Some(Value::BulkString(key)) => Ok((key, command_array)),
         _ => Err(anyhow!("key must be a BulkString")),
     }
 }
 
 fn parse_value(mut command_array: IntoIter<Value>) -> anyhow::Result<(Value, IntoIter<Value>)> {
     match command_array.next() {
-        Some(Value::BulkString(value)) => {Ok((Value::SimpleString(value), command_array))}
+        Some(Value::BulkString(value)) => Ok((Value::SimpleString(value), command_array)),
         _ => Err(anyhow!("Couldn't parse value")),
     }
 }
 
 fn parse_ttl(command_array: IntoIter<Value>) -> Option<Duration> {
-    let arr = command_array.filter_map(|v| {
-        if let Value::BulkString(value) = v {
-            Some(value)
-        } else {
-            None
-        }
-    }).collect::<Vec<_>>();
+    let arr = command_array
+        .filter_map(|v| {
+            if let Value::BulkString(value) = v {
+                Some(value)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
 
     if arr.len() < 2 {
         return None;
@@ -98,3 +98,4 @@ fn parse_ttl(command_array: IntoIter<Value>) -> Option<Duration> {
         None
     }
 }
+

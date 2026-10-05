@@ -1,7 +1,7 @@
 use crate::data::commands::{Command, CommandArray};
 use crate::data::types::Value::NullBulkString;
 use crate::data::types::Value::SimpleString;
-use crate::data::types::{RESPType, StoredValue, Value};
+use crate::data::types::{self, RESPType, StoredValue, Value};
 use crate::parser::commands::parse_command_array;
 use bytes::BytesMut;
 use dashmap::DashMap;
@@ -11,6 +11,7 @@ use std::time::SystemTime;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+pub(crate) mod commands;
 pub(crate) mod data;
 pub(crate) mod parser;
 pub mod storage;
@@ -75,7 +76,7 @@ fn execute_command(
             let now = SystemTime::now();
             let mut expired = false;
             if let Some(entry) = storage.get(&key) {
-                if entry.expires_at.map_or(true, |t| t > now) {
+                if entry.expires_at.is_none_or(|t| t > now) {
                     return Ok(entry.value.clone());
                 } else {
                     expired = true;
@@ -83,14 +84,15 @@ fn execute_command(
             }
             if expired {
                 eprintln!("Expired value for GET: {}. Removing", key);
-                let (key, value) = storage.remove(&key).unwrap();
+                let (key, _) = storage.remove(&key).unwrap();
                 eprintln!("Removed {}", key)
             } else {
                 eprintln!("No entry found");
             }
             Ok(NullBulkString())
         }
-        Command::RPUSH => {}
+        //Command::RPUSH => {}
+        _ => Ok(types::Value::Err("Unknown command".into())),
     }
 
     // match command_array.command {
