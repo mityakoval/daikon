@@ -3,22 +3,22 @@ use std::str::FromStr;
 use std::time::Duration;
 
 pub enum Command {
-    PING,
-    ECHO,
-    SET,
-    GET,
-    RPUSH,
+    Ping,
+    Echo,
+    Set,
+    Get,
+    RPush,
 }
 
 impl FromStr for Command {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "PING" => Ok(Command::PING),
-            "ECHO" => Ok(Command::ECHO),
-            "SET" => Ok(Command::SET),
-            "GET" => Ok(Command::GET),
-            "RPUSH" => Ok(Command::RPUSH),
+            "PING" => Ok(Command::Ping),
+            "ECHO" => Ok(Command::Echo),
+            "SET" => Ok(Command::Set),
+            "GET" => Ok(Command::Get),
+            "RPUSH" => Ok(Command::RPush),
             _ => Err(()),
         }
     }
@@ -26,21 +26,7 @@ impl FromStr for Command {
 
 pub struct CommandArray {
     pub(crate) command: Command,
-    pub(crate) length: u8,
     pub(crate) key: Option<String>,
     pub(crate) value: Option<Value>,
     pub(crate) ttl: Option<Duration>,
 }
-
-impl CommandArray {
-    fn execute(self) {
-        match self.command {
-            Command::PING => {}
-            Command::ECHO => {}
-            Command::SET => {}
-            Command::GET => {}
-            Command::RPUSH => {}
-        }
-    }
-}
-
