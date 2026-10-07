@@ -10,6 +10,7 @@ A self-contained reference for continuing the Redis clone without internet acces
 4. [Next 10 commands to implement](#4-next-10-commands-to-implement)
 5. [Stretch goals](#5-stretch-goals)
 6. [Testing without redis-cli](#6-testing-without-redis-cli)
+7. [How real Redis stores data](#7-how-real-redis-stores-data)
 
 ---
 
@@ -621,3 +622,53 @@ That last output is what real Redis sends. Daikon currently prints `+bar` (see [
 `${#arg}` counts characters, not bytes, so stick to ASCII. To see the exact bytes, including `\r\n`, pipe through `| od -c`.
 
 **Rust integration tests** also work offline. Create `tests/commands.rs`, start the server on a random port, connect with `tokio::net::TcpStream`, write raw RESP and assert on the raw reply bytes. This is how you'll catch regressions in the 10 commands above.
+
+---
+
+## 7. How real Redis stores data
+
+Real Redis doesn't use a concurrent hash map. Only one thread ever touches the data.
+
+### Single-threaded execution
+
+Every command runs on one main thread inside an event loop (`ae.c`, built on epoll or kqueue). A command runs to completion before the next one starts, so the data structures need no locks.
+
+- **Why it's fast enough:** Redis is limited by memory and network speed, not CPU. Lock-free single-threaded code that stays in the CPU cache is very fast.
+- **Every command is atomic.** `INCR`, `DEL a b c`, `RENAME`, `MULTI/EXEC` and Lua scripts can't interleave with anything else.
+- **Threads exist only around the edges.** Since Redis 6, optional I/O threads read sockets, parse RESP and write replies, but commands still run on the main thread. Background threads handle `fsync` and lazy freeing of big values (`UNLINK`).
+- **To use more cores, run more instances.** Redis Cluster splits keys across 16384 hash slots spread over many processes.
+
+### The keyspace
+
+Each database (16 by default, chosen with `SELECT`) is roughly:
+
+```c
+dict *dict;     // key (SDS string) → redisObject*
+dict *expires;  // key → expiry time as a Unix timestamp in ms (same key pointers)
+```
+
+| Piece | What it is |
+|---|---|
+| `dict` | Chained hash table, power-of-two sizes, SipHash. Resizes with **incremental rehashing**: it keeps an old and a new table, and every later operation moves a few buckets across (a timer helps too). Resizing never stalls the server, even with millions of keys. |
+| `expires` | A second `dict` holding only keys that have a TTL, so keys without one cost nothing extra. Keys expire **on access** (like `GET` in Daikon) and **in the background**: a timer samples random keys from `expires` and deletes the expired ones. |
+| `redisObject` | A small header on every value: type, encoding, LRU/LFU bits for eviction, reference count and a pointer to the data. The encoding is how one type can be stored several ways, e.g. a list as a listpack or a quicklist. |
+| SDS | "Simple dynamic string": length header plus a byte buffer. Binary-safe. Used for keys and string values. |
+
+- **In cluster mode** (Redis 7+), the keyspace is a `kvstore` with one dict per hash slot, so moving a slot to another node means iterating one small dict.
+- **Valkey 8.1** (the Redis fork) replaced `dict` with a cache-friendlier hash table that embeds keys in the value objects.
+
+### Persistence with `fork()`
+
+`BGSAVE` forks the process, and the child writes the snapshot while the parent keeps serving requests. The operating system copies only the memory pages the parent changes afterwards (copy-on-write). Redis avoids resizing tables while a child is running so it doesn't touch every page and force them all to be copied.
+
+### What this means for Daikon
+
+`Arc<DashMap>` is a sharded hash map with one lock per shard. It's fine for single-key commands. The difference from Redis shows up with **atomicity**:
+
+- Multi-key commands (`DEL a b`, `MSET`, `RENAME`, `MULTI/EXEC`) touch several shards, so other clients can see the intermediate state.
+- Read-check-write sequences across two DashMap calls can interleave with other clients (see the `GET` expiry race in [section 1](#1-where-you-are-now)).
+
+Two ways to get Redis-like behaviour:
+
+1. **`Mutex<HashMap>`**: one lock, so commands effectively run one at a time. Tokio's `mini-redis` example uses a plain `std::sync::Mutex` around a `HashMap`. That works because each command holds the lock very briefly and never across an `.await`.
+2. **An actor**: one task owns the `HashMap`, and connection tasks send it commands over an `mpsc` channel, each with a `oneshot` channel for the reply. This is the closest match to Redis's design, and it makes `MULTI/EXEC` and blocking commands like `BLPOP` easier later.
