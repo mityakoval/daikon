@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::time::Instant;
 
 use crate::{
     StorageMutex,
@@ -10,7 +10,7 @@ pub(crate) fn invoke(
     command_array: CommandArray,
 ) -> anyhow::Result<Value> {
     let key = command_array.key.unwrap();
-    let now = SystemTime::now();
+    let now = Instant::now();
     let mut expired = false;
     let mut storage = storage_mutex.lock().unwrap();
     if let Some(entry) = storage.get(&key) {

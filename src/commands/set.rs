@@ -1,4 +1,4 @@
-use std::{ops::Add, time::SystemTime};
+use std::{ops::Add, time::Instant};
 
 use crate::{
     StorageMutex,
@@ -20,7 +20,7 @@ pub(crate) fn invoke(
         command_array.key.unwrap(),
         StoredValue {
             value: command_array.value.unwrap(),
-            expires_at: command_array.ttl.map(|ttl| SystemTime::now().add(ttl)),
+            expires_at: command_array.ttl.map(|ttl| Instant::now().add(ttl)),
         },
     );
     Ok(SimpleString("OK".into()))

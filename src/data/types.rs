@@ -1,5 +1,5 @@
 use bytes::{BufMut, BytesMut};
-use std::time::SystemTime;
+use std::time::Instant;
 
 pub trait RESPType {
     fn encode(&mut self) -> BytesMut;
@@ -17,13 +17,13 @@ pub enum Value {
 #[derive(Debug)]
 pub struct StoredValue {
     pub value: Value,
-    pub expires_at: Option<SystemTime>,
+    pub expires_at: Option<Instant>,
 }
 
 impl StoredValue {
     pub fn is_expired(&self) -> bool {
         self.expires_at
-            .is_some_and(|expires_at| expires_at <= SystemTime::now())
+            .is_some_and(|expires_at| expires_at <= Instant::now())
     }
 }
 
