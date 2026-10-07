@@ -1,21 +1,19 @@
-use crate::data::commands::Command;
-use crate::data::types::Value::NullBulkString;
-use crate::data::types::Value::SimpleString;
-use crate::data::types::{RESPType, StoredValue, Value};
-use crate::parser::commands::parse_command;
+use crate::data::commands::{Command, CommandArray};
+use crate::data::types::{self, RESPType, StoredValue, Value};
+use crate::parser::commands::parse_command_array;
 use bytes::BytesMut;
 use dashmap::DashMap;
-use std::ops::Add;
 use std::sync::Arc;
-use std::time::SystemTime;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+pub(crate) mod commands;
 pub(crate) mod data;
 pub(crate) mod parser;
-pub mod storage;
 
-pub async fn handle_connection(mut stream: TcpStream, storage: Arc<DashMap<String, StoredValue>>) {
+type Storage = Arc<DashMap<String, StoredValue>>;
+
+pub async fn handle_connection(mut stream: TcpStream, storage: Storage) {
     let mut buf = BytesMut::with_capacity(1024);
     loop {
         match stream.read_buf(&mut buf).await {
@@ -24,7 +22,7 @@ pub async fn handle_connection(mut stream: TcpStream, storage: Arc<DashMap<Strin
                     break;
                 }
 
-                match parse_command(&mut buf) {
+                match parse_command_array(&mut buf) {
                     Ok(command) => {
                         let result = execute_command(command, &storage).unwrap();
                         respond(&mut stream, result).await;
@@ -46,42 +44,14 @@ pub async fn handle_connection(mut stream: TcpStream, storage: Arc<DashMap<Strin
     }
 }
 
-fn execute_command(
-    command: Command,
-    storage: &Arc<DashMap<String, StoredValue>>,
-) -> anyhow::Result<Value> {
-    match command {
-        Command::ECHO(value) => Ok(value),
-        Command::PING => Ok(SimpleString("PONG".into())),
-        Command::SET { key, value, ttl } => {
-            storage.insert(
-                key,
-                StoredValue {
-                    value,
-                    expires_at: ttl.map(|dur| SystemTime::now().add(dur)),
-                },
-            );
-            Ok(SimpleString("OK".into()))
-        }
-        Command::GET(key) => {
-            let now = SystemTime::now();
-            let mut expired = false;
-            if let Some(entry)  = storage.get(&key) {
-                    if entry.expires_at.map_or(true, |t| t > now) {
-                        return Ok(entry.value.clone())
-                    } else {
-                        expired = true;
-                    }
-            }
-            if expired {
-                eprintln!("Expired value for GET: {}. Removing", key);
-                let (key, value) = storage.remove(&key).unwrap();
-                eprintln!("Removed {}", key)
-            } else {
-                eprintln!("No entry found");
-            }
-            Ok(NullBulkString())
-        }
+fn execute_command(command_array: CommandArray, storage: &Storage) -> anyhow::Result<Value> {
+    match command_array.command {
+        Command::Ping => Ok(command_array.value.unwrap()),
+        Command::Echo => Ok(command_array.value.unwrap()),
+        Command::Set => commands::set::invoke(storage, command_array),
+        Command::Get => commands::get::invoke(storage, command_array),
+        //Command::RPUSH => {}
+        _ => Ok(types::Value::Err("Unknown command".into())),
     }
 }
 

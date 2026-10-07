@@ -1,6 +1,5 @@
-use std::time::SystemTime;
 use bytes::{BufMut, BytesMut};
-
+use std::time::SystemTime;
 
 pub trait RESPType {
     fn encode(&mut self) -> BytesMut;
@@ -12,11 +11,19 @@ pub enum Value {
     SimpleString(String),
     BulkString(String),
     NullBulkString(),
+    Err(String),
 }
 
 pub struct StoredValue {
     pub value: Value,
     pub expires_at: Option<SystemTime>,
+}
+
+impl StoredValue {
+    pub fn is_expired(&self) -> bool {
+        self.expires_at
+            .is_some_and(|expires_at| expires_at <= SystemTime::now())
+    }
 }
 
 impl RESPType for Value {
@@ -28,7 +35,7 @@ impl RESPType for Value {
                 encoded.extend_from_slice(format!("*{}\r\n", array.len()).as_bytes());
 
                 array
-                    .into_iter()
+                    .iter_mut()
                     .flat_map(|t| t.encode())
                     .for_each(|c| encoded.put_u8(c));
             }
@@ -41,7 +48,11 @@ impl RESPType for Value {
             Value::NullBulkString() => {
                 encoded.extend_from_slice(b"$-1\r\n");
             }
+            Value::Err(err_msg) => {
+                encoded.extend_from_slice(format!("-{}\r\n", err_msg).as_bytes());
+            }
         };
         encoded
     }
 }
+
