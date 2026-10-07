@@ -14,6 +14,7 @@ pub enum Value {
     Err(String),
 }
 
+#[derive(Debug)]
 pub struct StoredValue {
     pub value: Value,
     pub expires_at: Option<SystemTime>,
@@ -55,4 +56,3 @@ impl RESPType for Value {
         encoded
     }
 }
-
