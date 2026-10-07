@@ -65,7 +65,7 @@ fn parse_key(mut command_array: IntoIter<Value>) -> anyhow::Result<(String, Into
 
 fn parse_value(mut command_array: IntoIter<Value>) -> anyhow::Result<(Value, IntoIter<Value>)> {
     match command_array.next() {
-        Some(Value::BulkString(value)) => Ok((Value::SimpleString(value), command_array)),
+        Some(Value::BulkString(value)) => Ok((Value::BulkString(value), command_array)),
         _ => Err(anyhow!("Couldn't parse value")),
     }
 }

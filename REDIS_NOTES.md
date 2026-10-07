@@ -23,22 +23,36 @@ A self-contained reference for continuing the Redis clone without internet acces
 | `ECHO message` | Echoes the argument back as a bulk string |
 | `SET key value [EX seconds \| PX milliseconds]` | Overwrites any existing value and TTL |
 | `GET key` | Lazy expiry: checks the TTL on read and deletes the key if it has expired |
+| `RPUSH` | Parsed into `Command::RPush`, but not dispatched yet, so it replies `-Unknown command` |
+
+### Code layout
+
+- `src/parser/commands.rs`: `parse_command_array` turns the RESP array into a `CommandArray { command, key, value, ttl }`.
+- `src/lib.rs`: `execute_command` dispatches on `Command`.
+- `src/commands/<cmd>.rs`: one `invoke(storage, command_array)` per command (`get.rs`, `set.rs`).
+- `src/data/types.rs`: the `Value` RESP type and `StoredValue`.
 
 ### Implemented RESP types (`src/data/types.rs`)
 
-`Array`, `SimpleString`, `BulkString`, `NullBulkString`.
+`Array`, `SimpleString`, `BulkString`, `NullBulkString`, `Err` (encodes as `-{msg}\r\n`).
 
 ### Things the next commands will need
 
 Hints only, not solutions:
 
 - **RESP Integers (`:`)** — `DEL`, `EXISTS`, `INCR`, `TTL`, `RPUSH` and `HSET` all reply with integers. `Value` doesn't have an integer variant yet.
-- **RESP Errors (`-`)** — `src/data/errors.rs` encodes the raw message without the leading `-` or the trailing `\r\n`. You'll need proper errors for `WRONGTYPE`, `ERR value is not an integer…` and so on.
-- **Wire format vs. stored data** — `StoredValue.value` is a `Value`, which is a *protocol* type. Lists and hashes aren't RESP types, so you'll probably want a separate enum for what's stored, e.g. `enum RedisData { String(..), List(..), Hash(..) }`. Encode to RESP only when you send the reply.
-- **Wrong arity** — the parser `unwrap()`s on missing arguments, which panics the connection task. Real Redis replies `-ERR wrong number of arguments for 'get' command`.
-- **Case of options** — `parse_set` matches `"EX"`/`"PX"` exactly in `next_if`, so `set k v px 100` (lowercase) silently ignores the TTL. Redis options are case-insensitive.
-- **Pipelining** — if a client sends several commands in one TCP write, `parse_command` parses the first one and drops the rest (`parse_data_bytes` returns `rest`, which is never used).
-- **Expiry everywhere** — every command that reads a key must treat an expired key as missing. Pull the logic out of `GET` into a helper such as `get_live(&storage, key)`.
+- **`GET` and `ECHO` reply with the wrong type** — `parse_value` turns the incoming bulk string into a `Value::SimpleString`, and that's what gets stored, so `GET foo` replies `+bar\r\n` instead of `$3\r\nbar\r\n`. `ECHO hi` replies `+hi\r\n` for the same reason. Both should be bulk strings: a simple string can't hold `\r` or `\n`, and `GET` on an empty string must reply `$0\r\n\r\n`.
+- **Wire format vs. stored data** — the bug above is a symptom of this one. `StoredValue.value` is a `Value`, which is a *protocol* type. Lists and hashes aren't RESP types, so you'll probably want a separate enum for what's stored, e.g. `enum RedisData { String(..), List(..), Hash(..) }`. Encode to RESP only when you send the reply.
+- **`CommandArray` has one slot per argument** — `key`, `value` and `ttl` fit `GET`/`SET`, but `RPUSH key a b c`, `DEL a b c` and `HSET k f1 v1 f2 v2` take a variable number of arguments. Decide whether `CommandArray` grows a `Vec` of arguments, or whether each command parses its own arguments.
+- **Error replies** — `Value::Err` now encodes correctly, but every parse failure replies `-Unknown command`, whether the command is unknown, has too few arguments, or the input is malformed. By convention the first word is the error kind, so clients see the kind as `Unknown`. Redis replies:
+  - unknown command: `-ERR unknown command 'foo', with args beginning with: …`
+  - wrong argument count: `-ERR wrong number of arguments for 'get' command`. Extra arguments are an error too, but `GET a b` currently returns `a`.
+- **Bad `SET` options are ignored** — `parse_ttl` uppercases the option now, so `px` works. But `SET k v EX abc`, `SET k v EX 0` and `SET k v FOO 10` all reply `+OK` without a TTL. Redis replies `-ERR value is not an integer or out of range`, `-ERR invalid expire time in 'set' command` and `-ERR syntax error`.
+- **`unwrap()`s that kill the connection** — `execute_command(...).unwrap()` in `lib.rs` panics the task if a command returns `Err`. Pick a rule: errors the client should see become `Value::Err`, and `anyhow` errors are bugs. The parser also unwraps `parse_data_bytes(...)` and calls `split_to`/`split_off`, which panic when the buffer is too short.
+- **Pipelining and partial reads** — `parse_command_array` parses one command and drops the `rest` that `parse_data_bytes` returns, so a second command in the same TCP read gets no reply (`PING PING` in one write gets one `+PONG`). The opposite case, a command split across two reads, hits the panics above. You need to keep unparsed bytes in `buf` and parse in a loop until it's empty or incomplete.
+- **Expiry everywhere** — every command that reads a key must treat an expired key as missing. `StoredValue::is_expired()` exists, but `GET` checks the expiry inline instead. Build a helper such as `get_live(&storage, key)` on top of `is_expired()`.
+- **Expiry race in `GET`** — `GET` checks the expiry, drops the read guard and then calls `storage.remove(&key).unwrap()`. If another client deletes the key in between, the `unwrap()` panics. If another client `SET`s a fresh value in between, `GET` deletes the fresh value. `DashMap::remove_if` checks and removes under a single lock.
+- **CRLF check** — `next_resp_chunk` checks `bytes.get(chunk_sep_start)`, which is the `\r` it just found, so the test is always true. The comment says it meant to check for `\n`, which is at `chunk_sep_start + 1`.
 - **`SystemTime` vs `Instant`** — `SystemTime` can jump backwards (NTP, manual clock changes). `std::time::Instant` is monotonic and is the usual choice for TTLs. (Redis itself uses wall-clock ms because it persists absolute expiry times to disk.)
 
 ---
@@ -328,7 +342,7 @@ $2\r\n11            ← still a string
 - **`INCR` keeps the key's existing TTL** (whereas `SET` clears it).
 - On a list or hash: `-WRONGTYPE …`.
 
-**Learning point:** RESP errors. Fix `errors.rs` (or add `Value::Error(String)`) so that it emits `-{msg}\r\n`.
+**Learning point:** RESP error replies. `Value::Err` already encodes correctly; the work is choosing the exact `ERR …` text for each failure.
 
 **Easy follow-ups using the same code:** `DECR key`, `INCRBY key n`, `DECRBY key n`.
 
@@ -427,6 +441,8 @@ You can implement `TYPE` before `RPUSH` (only `string`/`none`) and extend it as 
 ### 7. `RPUSH key element [element ...]`
 
 Appends one or more elements to the tail of the list. Creates the list if the key doesn't exist.
+
+**Prerequisites if you do this before 1–6:** a `Value::Integer` for the reply (from `DEL`), a stored-data enum that can hold a list (from `TYPE`), and a `CommandArray` that can carry several elements (see [section 1](#1-where-you-are-now)).
 
 **Reply:** Integer, the list length **after** the push.
 
@@ -599,6 +615,8 @@ $ resp GET foo
 $3
 bar
 ```
+
+That last output is what real Redis sends. Daikon currently prints `+bar` (see [section 1](#1-where-you-are-now)).
 
 `${#arg}` counts characters, not bytes, so stick to ASCII. To see the exact bytes, including `\r\n`, pipe through `| od -c`.
 
