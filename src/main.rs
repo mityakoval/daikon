@@ -1,5 +1,5 @@
 use clap::Parser;
-use daikon::handle_connection;
+use daikon::{handle_connection, storage::Storage};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -22,10 +22,13 @@ async fn main() {
         .await
         .expect("Failed to bind");
 
-    let storage_mutex_arc = Arc::new(Mutex::new(HashMap::new()));
+    let storage_mutex = Arc::new(Mutex::new(Storage {
+        data: HashMap::new(),
+        expiry: HashMap::new(),
+    }));
 
     loop {
         let (stream, _socket_addr) = listener.accept().await.unwrap();
-        tokio::spawn(handle_connection(stream, Arc::clone(&storage_mutex_arc)));
+        tokio::spawn(handle_connection(stream, Arc::clone(&storage_mutex)));
     }
 }

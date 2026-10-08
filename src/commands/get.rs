@@ -1,31 +1,20 @@
-use std::time::Instant;
-
 use crate::{
-    StorageMutex,
+    DbMutex,
     data::{commands::CommandArray, types::Value},
 };
 
 pub(crate) fn invoke(
-    storage_mutex: &StorageMutex,
+    storage_mutex: &DbMutex,
     command_array: CommandArray,
 ) -> anyhow::Result<Value> {
     let key = command_array.key.unwrap();
-    let now = Instant::now();
-    let mut expired = false;
-    let mut storage = storage_mutex.lock().unwrap();
-    if let Some(entry) = storage.get(&key) {
-        if entry.expires_at.is_none_or(|t| t > now) {
+    if let Ok(mut storage) = storage_mutex.lock() {
+        if let Some(entry) = storage.get_live(&key) {
             return Ok(entry.value.clone());
-        } else {
-            expired = true;
         }
-    }
-    if expired {
-        println!("Expired value for GET: {}. Removing", key);
-        let key = storage.remove(&key).unwrap();
-        println!("Removed {:?}", key)
-    } else {
         println!("No entry found");
+        Ok(Value::NullBulkString())
+    } else {
+        Ok(Value::Err("Internal error occured".to_string()))
     }
-    Ok(Value::NullBulkString())
 }

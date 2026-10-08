@@ -1,7 +1,7 @@
-use std::{ops::Add, time::Instant};
+use std::{ops::Add, sync::Arc, time::Instant};
 
 use crate::{
-    StorageMutex,
+    DbMutex,
     data::{
         commands::CommandArray,
         types::{
@@ -12,16 +12,22 @@ use crate::{
 };
 
 pub(crate) fn invoke(
-    storage_mutex: &StorageMutex,
+    storage_mutex: &DbMutex,
     command_array: CommandArray,
 ) -> anyhow::Result<Value> {
-    let mut storage = storage_mutex.lock().unwrap();
-    storage.insert(
-        command_array.key.unwrap(),
-        StoredValue {
-            value: command_array.value.unwrap(),
-            expires_at: command_array.ttl.map(|ttl| Instant::now().add(ttl)),
-        },
-    );
-    Ok(SimpleString("OK".into()))
+    if let Ok(mut storage) = storage_mutex.lock() {
+        let key: Arc<str> = command_array.key.unwrap().into();
+        storage.data.insert(
+            Arc::clone(&key),
+            StoredValue {
+                value: command_array.value.unwrap(),
+            },
+        );
+        if let Some(expiration) = command_array.ttl.map(|ttl| Instant::now().add(ttl)) {
+            storage.expiry.insert(Arc::clone(&key), expiration);
+        }
+        Ok(SimpleString("OK".into()))
+    } else {
+        Ok(Value::Err("Internal error occured".to_string()))
+    }
 }
