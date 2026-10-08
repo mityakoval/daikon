@@ -17,6 +17,7 @@ pub(crate) fn invoke(
 ) -> anyhow::Result<Value> {
     if let Ok(mut storage) = storage_mutex.lock() {
         let key: Arc<str> = command_array.key.unwrap().into();
+        let existing_expiration = storage.expiry.contains_key(&key);
         storage.data.insert(
             Arc::clone(&key),
             StoredValue {
@@ -25,6 +26,8 @@ pub(crate) fn invoke(
         );
         if let Some(expiration) = command_array.ttl.map(|ttl| Instant::now().add(ttl)) {
             storage.expiry.insert(Arc::clone(&key), expiration);
+        } else if existing_expiration {
+            storage.expiry.remove(&key);
         }
         Ok(SimpleString("OK".into()))
     } else {
