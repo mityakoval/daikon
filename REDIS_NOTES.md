@@ -580,6 +580,11 @@ Roughly in increasing difficulty:
 
 **Server / infrastructure**
 - **Active expiry:** Redis also expires keys in the background, about 10 times per second. It samples 20 random keys that have a TTL, deletes the expired ones and repeats if more than 25% were expired. A `tokio::spawn` with `tokio::time::interval` is enough for a simple version.
+- **LRU eviction:** when memory use passes a limit, delete keys to make room, even ones without a TTL. This is different from expiry, which deletes a key because *its* time is up.
+  - Config: `maxmemory 100mb` plus `maxmemory-policy`. The default `noeviction` makes writes fail with `-OOM command not allowed when used memory > 'maxmemory'`. Other policies: `allkeys-lru`, `volatile-lru` (only keys with a TTL), `allkeys-lfu`/`volatile-lfu` (least *frequently* used), `allkeys-random`/`volatile-random`, `volatile-ttl` (closest to expiring).
+  - Redis's LRU is approximate. Exact LRU needs a linked list ordered by access time and an update on every read. Instead, every `redisObject` stores a 24-bit last-access clock. To evict, Redis samples `maxmemory-samples` random keys (default 5), keeps the best candidates in a small pool and evicts the oldest. With 10 samples it's nearly identical to true LRU.
+  - LFU keeps an 8-bit counter that grows logarithmically and decays over time. It beats LRU when a one-off scan touches many keys once, which under LRU pushes frequently used keys out.
+  - For Daikon: add a last-access `Instant` to `StoredValue`, update it in `get_live`, and use key count as a stand-in for memory (`maxkeys`) to start with.
 - `INFO`, `CONFIG GET dir`, `CLIENT SETNAME`, `COMMAND DOCS` (redis-cli sends this on connect; reply `*0`)
 - `MULTI` / `EXEC` / `DISCARD`: transactions. Queue commands per connection, reply `+QUEUED` to each, then run them all and return an array of results.
 - `SUBSCRIBE` / `PUBLISH`: pub/sub with `tokio::sync::broadcast`

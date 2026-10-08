@@ -1,4 +1,4 @@
-use crate::data::types::Value;
+use crate::data::resp_types::RESPValue;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -27,6 +27,6 @@ impl FromStr for Command {
 pub struct CommandArray {
     pub(crate) command: Command,
     pub(crate) key: Option<String>,
-    pub(crate) value: Option<Value>,
+    pub(crate) value: Option<RESPValue>,
     pub(crate) ttl: Option<Duration>,
 }

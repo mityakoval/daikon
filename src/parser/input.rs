@@ -1,7 +1,7 @@
-use crate::data::types::Value;
+use crate::data::resp_types::RESPValue;
 use bytes::BytesMut;
 
-pub fn parse_data_bytes(bytes: &mut BytesMut) -> Option<(Value, BytesMut)> {
+pub fn parse_data_bytes(bytes: &mut BytesMut) -> Option<(RESPValue, BytesMut)> {
     let (chunk, mut rest) = next_resp_chunk(bytes)?;
     eprintln!("\nparsing chunk: {:?}, rest: {:?}", chunk, rest);
     let mut chars = chunk.iter();
@@ -17,7 +17,7 @@ pub fn parse_data_bytes(bytes: &mut BytesMut) -> Option<(Value, BytesMut)> {
                     content.as_str(),
                     length
                 );
-                Some((Value::BulkString(content), rest.split_off(2)))
+                Some((RESPValue::BulkString(content), rest.split_off(2)))
             } else {
                 None
             }
@@ -34,7 +34,7 @@ pub fn parse_data_bytes(bytes: &mut BytesMut) -> Option<(Value, BytesMut)> {
                     array.push(t);
                     rest = new_rest;
                 }
-                Some((Value::Array(array), rest))
+                Some((RESPValue::Array(array), rest))
             } else {
                 None
             }

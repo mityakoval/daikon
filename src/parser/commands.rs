@@ -1,7 +1,7 @@
 use crate::data::commands::{Command, CommandArray};
-use crate::data::types::Value;
+use crate::data::resp_types::RESPValue;
 use crate::parser::input::parse_data_bytes;
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use bytes::BytesMut;
 use std::str::FromStr;
 use std::time::Duration;
@@ -9,22 +9,22 @@ use std::vec::IntoIter;
 
 pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<CommandArray> {
     match parse_data_bytes(input).unwrap() {
-        (Value::Array(command_array), _) => {
+        (RESPValue::Array(command_array), _) => {
             eprintln!("command array: {:?}", command_array);
             let mut command_array = command_array.into_iter();
             let command: Command;
 
-            if let Some(Value::BulkString(command_bulk_str)) = command_array.next() {
+            if let Some(RESPValue::BulkString(command_bulk_str)) = command_array.next() {
                 command = Command::from_str(command_bulk_str.to_uppercase().as_str())
                     .map_err(|_| anyhow!("Error parsing command bulk string"))?;
                 let mut key = None;
                 let mut value = None;
                 let mut ttl = None;
                 match command {
-                    Command::Ping => value = Some(Value::SimpleString("PONG".into())),
+                    Command::Ping => value = Some(RESPValue::SimpleString("PONG".into())),
 
                     Command::Echo => {
-                        value = Some(Value::SimpleString(parse_key(command_array)?.0));
+                        value = Some(RESPValue::SimpleString(parse_key(command_array)?.0));
                     }
 
                     Command::Set => {
@@ -56,24 +56,28 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
     }
 }
 
-fn parse_key(mut command_array: IntoIter<Value>) -> anyhow::Result<(String, IntoIter<Value>)> {
+fn parse_key(
+    mut command_array: IntoIter<RESPValue>,
+) -> anyhow::Result<(String, IntoIter<RESPValue>)> {
     match command_array.next() {
-        Some(Value::BulkString(key)) => Ok((key, command_array)),
+        Some(RESPValue::BulkString(key)) => Ok((key, command_array)),
         _ => Err(anyhow!("key must be a BulkString")),
     }
 }
 
-fn parse_value(mut command_array: IntoIter<Value>) -> anyhow::Result<(Value, IntoIter<Value>)> {
+fn parse_value(
+    mut command_array: IntoIter<RESPValue>,
+) -> anyhow::Result<(RESPValue, IntoIter<RESPValue>)> {
     match command_array.next() {
-        Some(Value::BulkString(value)) => Ok((Value::BulkString(value), command_array)),
+        Some(RESPValue::BulkString(value)) => Ok((RESPValue::BulkString(value), command_array)),
         _ => Err(anyhow!("Couldn't parse value")),
     }
 }
 
-fn parse_ttl(command_array: IntoIter<Value>) -> Option<Duration> {
+fn parse_ttl(command_array: IntoIter<RESPValue>) -> Option<Duration> {
     let arr = command_array
         .filter_map(|v| {
-            if let Value::BulkString(value) = v {
+            if let RESPValue::BulkString(value) = v {
                 Some(value)
             } else {
                 None

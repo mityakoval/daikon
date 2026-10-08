@@ -1,12 +1,14 @@
 use bytes::{BufMut, BytesMut};
 
+use crate::data::redis_data::RedisData;
+
 pub trait RESPType {
     fn encode(&mut self) -> BytesMut;
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Value {
-    Array(Vec<Value>),
+pub enum RESPValue {
+    Array(Vec<RESPValue>),
     SimpleString(String),
     BulkString(String),
     NullBulkString(),
@@ -15,14 +17,14 @@ pub enum Value {
 
 #[derive(Debug)]
 pub struct StoredValue {
-    pub value: Value,
+    pub value: RedisData,
 }
 
-impl RESPType for Value {
+impl RESPType for RESPValue {
     fn encode(&mut self) -> BytesMut {
         let mut encoded: BytesMut = BytesMut::new();
         match self {
-            Value::Array(array) => {
+            RESPValue::Array(array) => {
                 // Prepend with the array length
                 encoded.extend_from_slice(format!("*{}\r\n", array.len()).as_bytes());
 
@@ -31,16 +33,16 @@ impl RESPType for Value {
                     .flat_map(|t| t.encode())
                     .for_each(|c| encoded.put_u8(c));
             }
-            Value::SimpleString(value) => {
+            RESPValue::SimpleString(value) => {
                 encoded.extend_from_slice(format!("+{}\r\n", value).as_bytes());
             }
-            Value::BulkString(value) => {
+            RESPValue::BulkString(value) => {
                 encoded.extend_from_slice(format!("${}\r\n{}\r\n", value.len(), value).as_bytes());
             }
-            Value::NullBulkString() => {
+            RESPValue::NullBulkString() => {
                 encoded.extend_from_slice(b"$-1\r\n");
             }
-            Value::Err(err_msg) => {
+            RESPValue::Err(err_msg) => {
                 encoded.extend_from_slice(format!("-{}\r\n", err_msg).as_bytes());
             }
         };

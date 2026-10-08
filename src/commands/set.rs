@@ -4,9 +4,10 @@ use crate::{
     DbMutex,
     data::{
         commands::CommandArray,
-        types::{
+        redis_data::RedisData,
+        resp_types::{
+            RESPValue::{self, SimpleString},
             StoredValue,
-            Value::{self, SimpleString},
         },
     },
 };
@@ -14,14 +15,14 @@ use crate::{
 pub(crate) fn invoke(
     storage_mutex: &DbMutex,
     command_array: CommandArray,
-) -> anyhow::Result<Value> {
+) -> anyhow::Result<RESPValue> {
     if let Ok(mut storage) = storage_mutex.lock() {
         let key: Arc<str> = command_array.key.unwrap().into();
         let existing_expiration = storage.expiry.contains_key(&key);
         storage.data.insert(
             Arc::clone(&key),
             StoredValue {
-                value: command_array.value.unwrap(),
+                value: RedisData::String(command_array.value.unwrap()),
             },
         );
         if let Some(expiration) = command_array.ttl.map(|ttl| Instant::now().add(ttl)) {
@@ -31,6 +32,6 @@ pub(crate) fn invoke(
         }
         Ok(SimpleString("OK".into()))
     } else {
-        Ok(Value::Err("Internal error occured".to_string()))
+        Ok(RESPValue::Err("Internal error occured".to_string()))
     }
 }

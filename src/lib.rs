@@ -1,5 +1,5 @@
 use crate::data::commands::{Command, CommandArray};
-use crate::data::types::{self, RESPType, Value};
+use crate::data::resp_types::{self, RESPType, RESPValue};
 use crate::parser::commands::parse_command_array;
 use crate::storage::Storage;
 use bytes::BytesMut;
@@ -45,14 +45,14 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
     }
 }
 
-fn execute_command(command_array: CommandArray, storage: &DbMutex) -> anyhow::Result<Value> {
+fn execute_command(command_array: CommandArray, storage: &DbMutex) -> anyhow::Result<RESPValue> {
     match command_array.command {
         Command::Ping => Ok(command_array.value.unwrap()),
         Command::Echo => Ok(command_array.value.unwrap()),
         Command::Set => commands::set::invoke(storage, command_array),
         Command::Get => commands::get::invoke(storage, command_array),
         //Command::RPUSH => {}
-        _ => Ok(types::Value::Err("Unknown command".into())),
+        _ => Ok(resp_types::RESPValue::Err("Unknown command".into())),
     }
 }
 

@@ -1,20 +1,20 @@
 use crate::{
     DbMutex,
-    data::{commands::CommandArray, types::Value},
+    data::{commands::CommandArray, resp_types::RESPValue},
 };
 
 pub(crate) fn invoke(
     storage_mutex: &DbMutex,
     command_array: CommandArray,
-) -> anyhow::Result<Value> {
+) -> anyhow::Result<RESPValue> {
     let key = command_array.key.unwrap();
     if let Ok(mut storage) = storage_mutex.lock() {
         if let Some(entry) = storage.get_live(&key) {
             return Ok(entry.value.clone());
         }
         println!("No entry found");
-        Ok(Value::NullBulkString())
+        Ok(RESPValue::NullBulkString())
     } else {
-        Ok(Value::Err("Internal error occured".to_string()))
+        Ok(RESPValue::Err("Internal error occured".to_string()))
     }
 }
