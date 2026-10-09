@@ -11,6 +11,7 @@ pub enum RESPValue {
     Array(Vec<RESPValue>),
     SimpleString(String),
     BulkString(String),
+    Integer(i64),
     NullBulkString(),
     Err(String),
 }
@@ -38,6 +39,9 @@ impl RESPType for RESPValue {
             }
             RESPValue::BulkString(value) => {
                 encoded.extend_from_slice(format!("${}\r\n{}\r\n", value.len(), value).as_bytes());
+            }
+            RESPValue::Integer(value) => {
+                encoded.extend_from_slice(format!(":{}\r\n", value).as_bytes());
             }
             RESPValue::NullBulkString() => {
                 encoded.extend_from_slice(b"$-1\r\n");

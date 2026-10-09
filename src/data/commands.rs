@@ -27,6 +27,6 @@ impl FromStr for Command {
 pub struct CommandArray {
     pub(crate) command: Command,
     pub(crate) key: Option<String>,
-    pub(crate) value: Option<RESPValue>,
+    pub(crate) value: Option<Vec<RESPValue>>,
     pub(crate) ttl: Option<Duration>,
 }

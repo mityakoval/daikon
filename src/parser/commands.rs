@@ -31,7 +31,7 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                         let (_key, rest) = parse_key(command_array)?;
                         key = Some(_key);
                         let (_value, rest) = parse_value(rest)?;
-                        value = Some(_value);
+                        value = Some(vec![_value]);
                         ttl = parse_ttl(rest);
                     }
 

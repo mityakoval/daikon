@@ -10,7 +10,7 @@ pub(crate) fn invoke(
     let key = command_array.key.unwrap();
     if let Ok(mut storage) = storage_mutex.lock() {
         if let Some(entry) = storage.get_live(&key) {
-            return Ok(entry.value.clone());
+            return Ok(entry.value.to_resp_value());
         }
         println!("No entry found");
         Ok(RESPValue::NullBulkString())

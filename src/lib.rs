@@ -51,7 +51,7 @@ fn execute_command(command_array: CommandArray, storage: &DbMutex) -> anyhow::Re
         Command::Echo => Ok(command_array.value.unwrap()),
         Command::Set => commands::set::invoke(storage, command_array),
         Command::Get => commands::get::invoke(storage, command_array),
-        //Command::RPUSH => {}
+        Command::RPUSH => commands::rpush::invoke(storage, command_array),
         _ => Ok(resp_types::RESPValue::Err("Unknown command".into())),
     }
 }

@@ -1,14 +1,14 @@
 use std::{collections::HashMap, sync::Arc, time::Instant};
 
-use crate::data::redis_data::RedisData;
+use crate::data::resp_types::StoredValue;
 
 pub struct Storage {
-    pub data: HashMap<Arc<str>, RedisData>,
+    pub data: HashMap<Arc<str>, StoredValue>,
     pub expiry: HashMap<Arc<str>, Instant>,
 }
 
 impl Storage {
-    pub(crate) fn get_live(&mut self, key: &str) -> Option<&RedisData> {
+    pub(crate) fn get_live(&mut self, key: &str) -> Option<&StoredValue> {
         let expired = self
             .expiry
             .get(key)
