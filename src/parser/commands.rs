@@ -11,13 +11,11 @@ use std::time::Duration;
 pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<CommandArray> {
     match parse_data_bytes(input).unwrap() {
         (RESPValue::Array(mut command_array), _) => {
-            debug!("command array: {:?}", command_array);
+            trace!("Parsed array: {:?}", command_array);
 
             if let Some(RESPValue::BulkString(command_bulk_str)) = command_array.pop_front() {
                 let command = Command::from_str(command_bulk_str.to_uppercase().as_str())
                     .context("parsing command")?;
-
-                debug!("❤️ Received command: {:?}", command);
 
                 let mut key = None;
                 let mut value = None;

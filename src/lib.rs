@@ -8,12 +8,18 @@ use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-pub static DEBUG: AtomicBool = AtomicBool::new(false);
+pub static DEBUG: AtomicBool = AtomicBool::new(true);
+pub static TRACE: AtomicBool = AtomicBool::new(false);
 
-#[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => {
         if $crate::DEBUG.load(::std::sync::atomic::Ordering::Relaxed) { eprintln!($($arg)*); }
+    };
+}
+
+macro_rules! trace {
+    ($($arg:tt)*) => {
+        if $crate::TRACE.load(::std::sync::atomic::Ordering::Relaxed) { eprintln!($($arg)*); }
     };
 }
 
@@ -32,15 +38,17 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
                 if size == 0 {
                     break;
                 }
-                debug!("========================");
-                debug!("= RECEIVED NEW REQUEST =");
-                debug!("========================");
-                debug!("\nREQUEST: {:?}\n", buf);
+                eprintln!("\n🔵 Incoming request");
+                trace!("Buffer: {:?}", buf);
 
                 match parse_command_array(&mut buf) {
-                    Ok(command) => {
-                        eprintln!("Received command: {:?}\n🔄 Executing...", command);
-                        let result = execute_command(command, &db_mutex).unwrap();
+                    Ok(command_array) => {
+                        eprintln!(
+                            "🔹 Received command: '{}'\n🔄 Executing...",
+                            command_array.command.name
+                        );
+                        trace!("🔸 Command array: {:?}", command_array);
+                        let result = execute_command(command_array, &db_mutex).unwrap();
                         eprintln!("✅ Done!");
                         respond(&mut stream, result).await;
                     }
