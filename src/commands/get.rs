@@ -12,7 +12,7 @@ pub(crate) fn invoke(
         if let Some(entry) = storage.get_live(&key) {
             return Ok(entry.value.to_resp_value());
         }
-        println!("No entry found");
+        debug!("No entry found");
         Ok(RESPValue::NullBulkString())
     } else {
         Ok(RESPValue::Err("Internal error occured".to_string()))

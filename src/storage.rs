@@ -14,10 +14,10 @@ impl Storage {
             .get(key)
             .is_some_and(|expires_at| *expires_at <= Instant::now());
         if expired {
-            println!("Found expired value for: {}. Removing", key);
+            eprintln!("Found expired value for: {}. Removing", key);
             self.data.remove(key);
             self.expiry.remove(key);
-            println!("Removed {:?}", key);
+            debug!("Removed {:?}", key);
             None
         } else {
             self.data.get(key)
