@@ -1,5 +1,5 @@
 use crate::data::commands::{CommandArray, CommandName};
-use crate::data::resp_types::{self, RESPType, RESPValue};
+use crate::data::resp_types::{RESPType, RESPValue};
 use crate::parser::commands::parse_command_array;
 use crate::storage::Storage;
 use bytes::BytesMut;
@@ -68,7 +68,6 @@ fn execute_command(command_array: CommandArray, storage: &DbMutex) -> anyhow::Re
         CommandName::Set => commands::set::invoke(storage, command_array),
         CommandName::Get => commands::get::invoke(storage, command_array),
         CommandName::RPush => commands::rpush::invoke(storage, command_array),
-        _ => Ok(resp_types::RESPValue::Err("Unknown command".into())),
     }
 }
 
