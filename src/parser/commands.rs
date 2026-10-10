@@ -1,46 +1,78 @@
-use crate::data::commands::{Command, CommandArray};
+use crate::data::commands::{Command, CommandArray, ValueType};
 use crate::data::resp_types::RESPValue;
 use crate::parser::input::parse_data_bytes;
-use anyhow::{Error, anyhow};
+use anyhow::{Context, Error, anyhow};
 use bytes::BytesMut;
+use std::collections::VecDeque;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
-use std::vec::IntoIter;
 
 pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<CommandArray> {
     match parse_data_bytes(input).unwrap() {
-        (RESPValue::Array(command_array), _) => {
-            eprintln!("command array: {:?}", command_array);
-            let mut command_array = command_array.into_iter();
-            let command: Command;
+        (RESPValue::Array(mut command_array), _) => {
+            debug!("command array: {:?}", command_array);
 
-            if let Some(RESPValue::BulkString(command_bulk_str)) = command_array.next() {
-                command = Command::from_str(command_bulk_str.to_uppercase().as_str())
-                    .map_err(|_| anyhow!("Error parsing command bulk string"))?;
+            if let Some(RESPValue::BulkString(command_bulk_str)) = command_array.pop_front() {
+                let command = Command::from_str(command_bulk_str.to_uppercase().as_str())
+                    .context("parsing command")?;
+
+                debug!("❤️ Received command: {:?}", command);
+
                 let mut key = None;
                 let mut value = None;
                 let mut ttl = None;
-                match command {
-                    Command::Ping => value = Some(RESPValue::SimpleString("PONG".into())),
 
-                    Command::Echo => {
-                        value = Some(RESPValue::SimpleString(parse_key(command_array)?.0));
+                if command.rules.has_key {
+                    if let Some(_key) = command_array.pop_front() {
+                        key = Some(parse_key(_key).context("parsing key")?);
+                    } else {
+                        return Err(anyhow!(
+                            "wrong number of arguments for '{}' command",
+                            command.name
+                        ));
                     }
+                }
 
-                    Command::Set => {
-                        let (_key, rest) = parse_key(command_array)?;
-                        key = Some(_key);
-                        let (_value, rest) = parse_value(rest)?;
-                        value = Some(vec![_value]);
-                        ttl = parse_ttl(rest);
+                if command.rules.allows_ttl {
+                    let (remaining_array, _ttl) =
+                        parse_ttl(command_array).context("parsing ttl")?;
+                    ttl = _ttl;
+                    command_array = remaining_array;
+                }
+
+                match command.rules.value_type {
+                    ValueType::None => {
+                        if !command_array.is_empty() {
+                            eprintln!(
+                                "⚠️ Expected 0 values for command {:?}, got {}",
+                                command.name,
+                                command_array.len()
+                            );
+                            return Err(anyhow!(
+                                "wrong number of arguments for '{}' command",
+                                command.name
+                            ));
+                        }
                     }
-
-                    Command::Get => {
-                        let (_key, _) = parse_key(command_array)?;
-                        key = Some(_key);
+                    ValueType::Single => {
+                        if command_array.len() == 1 {
+                            value = Some(vec![command_array.pop_back().unwrap()]);
+                        } else {
+                            eprintln!(
+                                "⚠️ Expected 1 value for command {:?}, got {}",
+                                command.name,
+                                command_array.len()
+                            );
+                            return Err(anyhow!(
+                                "wrong number of arguments for '{}' command",
+                                command.name
+                            ));
+                        }
                     }
-
-                    Command::RPush => {}
+                    ValueType::List => {
+                        value = Some(Vec::from(command_array));
+                    }
                 }
                 Ok(CommandArray {
                     command,
@@ -56,48 +88,48 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
     }
 }
 
-fn parse_key(
-    mut command_array: IntoIter<RESPValue>,
-) -> anyhow::Result<(String, IntoIter<RESPValue>)> {
-    match command_array.next() {
-        Some(RESPValue::BulkString(key)) => Ok((key, command_array)),
-        _ => Err(anyhow!("key must be a BulkString")),
-    }
-}
-
-fn parse_value(
-    mut command_array: IntoIter<RESPValue>,
-) -> anyhow::Result<(RESPValue, IntoIter<RESPValue>)> {
-    match command_array.next() {
-        Some(RESPValue::BulkString(value)) => Ok((RESPValue::BulkString(value), command_array)),
-        _ => Err(anyhow!("Couldn't parse value")),
-    }
-}
-
-fn parse_ttl(command_array: IntoIter<RESPValue>) -> Option<Duration> {
-    let arr = command_array
-        .filter_map(|v| {
-            if let RESPValue::BulkString(value) = v {
-                Some(value)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-
-    if arr.len() < 2 {
-        return None;
-    }
-    if let Ok(ttl) = arr[1].parse::<u64>() {
-        let ttl_str = arr[0].to_uppercase();
-        if ttl_str == "EX" {
-            Some(Duration::from_secs(ttl))
-        } else if ttl_str == "PX" {
-            Some(Duration::from_millis(ttl))
-        } else {
-            None
-        }
+fn parse_key(key: RESPValue) -> anyhow::Result<Arc<str>> {
+    if let RESPValue::BulkString(key) = key {
+        Ok(Arc::<str>::from(key.to_owned()))
     } else {
-        None
+        Err(anyhow!("key must be a BulkString"))
+    }
+}
+
+fn parse_ttl(
+    mut array: VecDeque<RESPValue>,
+) -> anyhow::Result<(VecDeque<RESPValue>, Option<Duration>)> {
+    let rem_len = array.len();
+    if rem_len < 2 {
+        return Ok((array, None));
+    }
+    let ttl;
+    let units;
+    match array[rem_len - 2] {
+        RESPValue::BulkString(ref _units) => {
+            if ["EX", "PX"].contains(&_units.to_uppercase().as_str()) {
+                ttl = array.pop_back().unwrap();
+                units = array.pop_back().unwrap();
+                match units {
+                    RESPValue::BulkString(units) => {
+                        let ttl = match ttl {
+                            RESPValue::BulkString(ttl) => ttl.parse::<u64>()?,
+                            _ => {
+                                return Err(anyhow!("Malformed ttl"));
+                            }
+                        };
+                        match units.to_uppercase().as_str() {
+                            "EX" => Ok((array, Some(Duration::from_secs(ttl)))),
+                            "PX" => Ok((array, Some(Duration::from_millis(ttl)))),
+                            _ => Err(anyhow!("Malformed ttl")),
+                        }
+                    }
+                    _ => Err(anyhow!("Malformed ttl")),
+                }
+            } else {
+                Ok((array, None))
+            }
+        }
+        _ => Ok((array, None)),
     }
 }

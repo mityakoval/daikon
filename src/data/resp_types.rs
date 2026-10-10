@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use bytes::{BufMut, BytesMut};
 
 use crate::data::redis_data::RedisData;
@@ -8,7 +10,7 @@ pub trait RESPType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RESPValue {
-    Array(Vec<RESPValue>),
+    Array(VecDeque<RESPValue>),
     SimpleString(String),
     BulkString(String),
     Integer(i64),
@@ -47,7 +49,7 @@ impl RESPType for RESPValue {
                 encoded.extend_from_slice(b"$-1\r\n");
             }
             RESPValue::Err(err_msg) => {
-                encoded.extend_from_slice(format!("-{}\r\n", err_msg).as_bytes());
+                encoded.extend_from_slice(format!("-ERR {}\r\n", err_msg).as_bytes());
             }
         };
         encoded

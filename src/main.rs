@@ -2,7 +2,7 @@ use clap::Parser;
 use daikon::{handle_connection, storage::Storage};
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, atomic::AtomicBool},
 };
 use tokio::net::TcpListener;
 

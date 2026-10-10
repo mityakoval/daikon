@@ -1,11 +1,21 @@
-use crate::data::commands::{Command, CommandArray};
+use crate::data::commands::{CommandArray, CommandName};
 use crate::data::resp_types::{self, RESPType, RESPValue};
 use crate::parser::commands::parse_command_array;
 use crate::storage::Storage;
 use bytes::BytesMut;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+
+pub static DEBUG: AtomicBool = AtomicBool::new(false);
+
+#[macro_export]
+macro_rules! debug {
+    ($($arg:tt)*) => {
+        if $crate::DEBUG.load(::std::sync::atomic::Ordering::Relaxed) { eprintln!($($arg)*); }
+    };
+}
 
 pub(crate) mod commands;
 pub(crate) mod data;
@@ -22,14 +32,20 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
                 if size == 0 {
                     break;
                 }
+                debug!("========================");
+                debug!("= RECEIVED NEW REQUEST =");
+                debug!("========================");
+                debug!("\nREQUEST: {:?}\n", buf);
 
                 match parse_command_array(&mut buf) {
                     Ok(command) => {
+                        eprintln!("Received command: {:?}\n🔄 Executing...", command);
                         let result = execute_command(command, &db_mutex).unwrap();
+                        eprintln!("✅ Done!");
                         respond(&mut stream, result).await;
                     }
                     Err(e) => {
-                        eprintln!("Error parsing command: {:#}", e);
+                        eprintln!("⚠️ Error parsing command: {:#}", e);
                         stream
                             .write_all("-Unknown command\r\n".as_bytes())
                             .await
@@ -46,12 +62,12 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
 }
 
 fn execute_command(command_array: CommandArray, storage: &DbMutex) -> anyhow::Result<RESPValue> {
-    match command_array.command {
-        Command::Ping => Ok(command_array.value.unwrap()),
-        Command::Echo => Ok(command_array.value.unwrap()),
-        Command::Set => commands::set::invoke(storage, command_array),
-        Command::Get => commands::get::invoke(storage, command_array),
-        Command::RPUSH => commands::rpush::invoke(storage, command_array),
+    match command_array.command.name {
+        CommandName::Ping => Ok(commands::ping::invoke()),
+        CommandName::Echo => commands::echo::invoke(command_array),
+        CommandName::Set => commands::set::invoke(storage, command_array),
+        CommandName::Get => commands::get::invoke(storage, command_array),
+        CommandName::RPush => commands::rpush::invoke(storage, command_array),
         _ => Ok(resp_types::RESPValue::Err("Unknown command".into())),
     }
 }

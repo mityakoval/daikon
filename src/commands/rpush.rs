@@ -6,5 +6,6 @@ use crate::{
 pub(crate) fn invoke(
     storage_mut: &DbMutex,
     command_array: CommandArray,
-) -> anyhow::Result<RESPValue::Integer> {
+) -> anyhow::Result<RESPValue> {
+    Ok(RESPValue::Integer(1))
 }
