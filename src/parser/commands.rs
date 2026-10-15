@@ -75,7 +75,7 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                 Ok(CommandArray {
                     command,
                     key,
-                    value,
+                    values: value,
                     ttl,
                 })
             } else {

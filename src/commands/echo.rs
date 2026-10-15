@@ -6,7 +6,7 @@ use crate::data::{
 };
 
 pub(crate) fn invoke(command_array: CommandArray) -> anyhow::Result<RESPValue> {
-    match command_array.value.unwrap().into_iter().next() {
+    match command_array.values.unwrap().into_iter().next() {
         Some(RESPValue::BulkString(value)) => Ok(RESPValue::SimpleString(value)),
         _ => Ok(Err("Malformed arguments for command 'echo'".into())),
     }

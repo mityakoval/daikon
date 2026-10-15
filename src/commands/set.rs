@@ -16,7 +16,7 @@ pub(crate) fn invoke(
 ) -> anyhow::Result<RESPValue> {
     let key = command_array.key.unwrap();
 
-    let values = command_array.value.unwrap();
+    let values = command_array.values.unwrap();
 
     let Some(RESPValue::BulkString(value)) = values.into_iter().next() else {
         return Ok(Err("Value cannot be stored".into()));

@@ -1,3 +1,4 @@
+pub(crate) mod del;
 pub(crate) mod echo;
 pub(crate) mod get;
 pub(crate) mod ping;

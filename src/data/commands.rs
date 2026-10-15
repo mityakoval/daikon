@@ -26,6 +26,7 @@ pub enum CommandName {
     Echo,
     Set,
     Get,
+    Del,
     RPush,
 }
 
@@ -77,6 +78,14 @@ impl FromStr for Command {
                     value_type: ValueType::None,
                 },
             }),
+            "DEL" => Ok(Command {
+                name: CommandName::Del,
+                rules: CommandRules {
+                    has_key: true,
+                    allows_ttl: false,
+                    value_type: ValueType::None,
+                },
+            }),
             "RPUSH" => Ok(Command {
                 name: CommandName::RPush,
                 rules: CommandRules {
@@ -94,6 +103,6 @@ impl FromStr for Command {
 pub struct CommandArray {
     pub(crate) command: Command,
     pub(crate) key: Option<Arc<str>>,
-    pub(crate) value: Option<Vec<RESPValue>>,
+    pub(crate) values: Option<Vec<RESPValue>>,
     pub(crate) ttl: Option<Duration>,
 }
