@@ -1,3 +1,26 @@
-use crate::data::resp_types::RESPValue;
+use std::ops::Add;
 
-pub(crate) fn del() -> anyhow::Result<RESPValue> {}
+use crate::{
+    DbMutex,
+    data::{commands::CommandArray, resp_types::RESPValue},
+};
+
+pub(crate) fn invoke(
+    storage_mutex: &DbMutex,
+    command_array: CommandArray,
+) -> anyhow::Result<RESPValue> {
+    if let Ok(mut storage) = storage_mutex.lock() {
+        let removed = command_array.keys.unwrap().iter().fold(0i64, |acc, k| {
+            if storage.get_live(k).is_some() {
+                storage.data.remove(k);
+                debug!("Removed {:?}", k);
+                acc.add(1)
+            } else {
+                acc.add(0)
+            }
+        });
+        Ok(RESPValue::Integer(removed))
+    } else {
+        Ok(RESPValue::Err("Internal error occured".to_string()))
+    }
+}

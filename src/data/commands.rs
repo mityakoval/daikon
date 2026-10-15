@@ -7,7 +7,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug)]
-pub(crate) enum ValueType {
+pub(crate) enum ArgShape {
+    None,
+    Value,
+    Key,
+    MultipleKeys,
+    KeyValue,
+    KeyMultipleValues,
+    Pairs,
+}
+
+#[derive(Debug)]
+pub(crate) enum KeyType {
     None,
     Single,
     List,
@@ -15,9 +26,8 @@ pub(crate) enum ValueType {
 
 #[derive(Debug)]
 pub(crate) struct CommandRules {
-    pub(crate) has_key: bool,
     pub(crate) allows_ttl: bool,
-    pub(crate) value_type: ValueType,
+    pub(crate) args: ArgShape,
 }
 
 #[derive(Debug)]
@@ -49,49 +59,43 @@ impl FromStr for Command {
             "PING" => Ok(Command {
                 name: CommandName::Ping,
                 rules: CommandRules {
-                    has_key: false,
                     allows_ttl: false,
-                    value_type: ValueType::None,
+                    args: ArgShape::None,
                 },
             }),
             "ECHO" => Ok(Command {
                 name: CommandName::Echo,
                 rules: CommandRules {
                     allows_ttl: false,
-                    has_key: false,
-                    value_type: ValueType::Single,
+                    args: ArgShape::Value,
                 },
             }),
             "SET" => Ok(Command {
                 name: CommandName::Set,
                 rules: CommandRules {
                     allows_ttl: true,
-                    has_key: true,
-                    value_type: ValueType::Single,
+                    args: ArgShape::KeyValue,
                 },
             }),
             "GET" => Ok(Command {
                 name: CommandName::Get,
                 rules: CommandRules {
                     allows_ttl: false,
-                    has_key: true,
-                    value_type: ValueType::None,
+                    args: ArgShape::Key,
                 },
             }),
             "DEL" => Ok(Command {
                 name: CommandName::Del,
                 rules: CommandRules {
-                    has_key: true,
                     allows_ttl: false,
-                    value_type: ValueType::None,
+                    args: ArgShape::MultipleKeys,
                 },
             }),
             "RPUSH" => Ok(Command {
                 name: CommandName::RPush,
                 rules: CommandRules {
-                    has_key: true,
                     allows_ttl: true,
-                    value_type: ValueType::List,
+                    args: ArgShape::KeyMultipleValues,
                 },
             }),
             _ => Err(anyhow!("Unknown command '{}'", s)),
@@ -102,7 +106,7 @@ impl FromStr for Command {
 #[derive(Debug)]
 pub struct CommandArray {
     pub(crate) command: Command,
-    pub(crate) key: Option<Arc<str>>,
+    pub(crate) keys: Option<Vec<Arc<str>>>,
     pub(crate) values: Option<Vec<RESPValue>>,
     pub(crate) ttl: Option<Duration>,
 }

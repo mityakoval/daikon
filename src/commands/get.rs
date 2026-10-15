@@ -7,7 +7,7 @@ pub(crate) fn invoke(
     storage_mutex: &DbMutex,
     command_array: CommandArray,
 ) -> anyhow::Result<RESPValue> {
-    let key = command_array.key.unwrap();
+    let key = command_array.keys.unwrap().pop().unwrap();
     if let Ok(mut storage) = storage_mutex.lock() {
         if let Some(entry) = storage.get_live(&key) {
             return Ok(entry.value.to_resp_value());

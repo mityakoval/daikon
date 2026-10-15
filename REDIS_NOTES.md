@@ -41,9 +41,9 @@ A self-contained reference for continuing the Redis clone without internet acces
 
 Hints only, not solutions:
 
-- [ ] **RESP Integers (`:`)** — `DEL`, `EXISTS`, `INCR`, `TTL`, `RPUSH` and `HSET` all reply with integers. `Value` doesn't have an integer variant yet.
+- [x] **RESP Integers (`:`)** — `DEL`, `EXISTS`, `INCR`, `TTL`, `RPUSH` and `HSET` all reply with integers. `Value` doesn't have an integer variant yet.
 - [x] **`GET` and `ECHO` reply with the wrong type** — `parse_value` turns the incoming bulk string into a `Value::SimpleString`, and that's what gets stored, so `GET foo` replies `+bar\r\n` instead of `$3\r\nbar\r\n`. `ECHO hi` replies `+hi\r\n` for the same reason. Both should be bulk strings: a simple string can't hold `\r` or `\n`, and `GET` on an empty string must reply `$0\r\n\r\n`.
-- [ ] **Wire format vs. stored data** — the bug above is a symptom of this one. `StoredValue.value` is a `Value`, which is a *protocol* type. Lists and hashes aren't RESP types, so you'll probably want a separate enum for what's stored, e.g. `enum RedisData { String(..), List(..), Hash(..) }`. Encode to RESP only when you send the reply.
+- [x] **Wire format vs. stored data** — the bug above is a symptom of this one. `StoredValue.value` is a `Value`, which is a *protocol* type. Lists and hashes aren't RESP types, so you'll probably want a separate enum for what's stored, e.g. `enum RedisData { String(..), List(..), Hash(..) }`. Encode to RESP only when you send the reply.
 - [ ] **`CommandArray` has one slot per argument** — `key`, `value` and `ttl` fit `GET`/`SET`, but `RPUSH key a b c`, `DEL a b c` and `HSET k f1 v1 f2 v2` take a variable number of arguments. Decide whether `CommandArray` grows a `Vec` of arguments, or whether each command parses its own arguments.
 - [ ] **Error replies** — `Value::Err` now encodes correctly, but every parse failure replies `-Unknown command`, whether the command is unknown, has too few arguments, or the input is malformed. By convention the first word is the error kind, so clients see the kind as `Unknown`. Redis replies:
   - unknown command: `-ERR unknown command 'foo', with args beginning with: …`

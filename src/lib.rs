@@ -9,7 +9,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 pub static DEBUG: AtomicBool = AtomicBool::new(true);
-pub static TRACE: AtomicBool = AtomicBool::new(false);
+pub static TRACE: AtomicBool = AtomicBool::new(true);
 
 macro_rules! debug {
     ($($arg:tt)*) => {
@@ -76,6 +76,7 @@ fn execute_command(command_array: CommandArray, storage: &DbMutex) -> anyhow::Re
         CommandName::Set => commands::set::invoke(storage, command_array),
         CommandName::Get => commands::get::invoke(storage, command_array),
         CommandName::RPush => commands::rpush::invoke(storage, command_array),
+        CommandName::Del => commands::del::invoke(storage, command_array),
     }
 }
 

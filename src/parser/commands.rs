@@ -1,4 +1,4 @@
-use crate::data::commands::{Command, CommandArray, ValueType};
+use crate::data::commands::{ArgShape, Command, CommandArray};
 use crate::data::resp_types::RESPValue;
 use crate::parser::input::parse_data_bytes;
 use anyhow::{Context, Error, anyhow};
@@ -17,20 +17,9 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                 let command = Command::from_str(command_bulk_str.to_uppercase().as_str())
                     .context("parsing command")?;
 
-                let mut key = None;
-                let mut value = None;
+                let mut keys = None;
+                let mut values = None;
                 let mut ttl = None;
-
-                if command.rules.has_key {
-                    if let Some(_key) = command_array.pop_front() {
-                        key = Some(parse_key(_key).context("parsing key")?);
-                    } else {
-                        return Err(anyhow!(
-                            "wrong number of arguments for '{}' command",
-                            command.name
-                        ));
-                    }
-                }
 
                 if command.rules.allows_ttl {
                     let (remaining_array, _ttl) =
@@ -39,11 +28,15 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                     command_array = remaining_array;
                 }
 
-                match command.rules.value_type {
-                    ValueType::None => {
+                // if command.rules.has_key {
+                //
+                // }
+
+                match command.rules.args {
+                    ArgShape::None => {
                         if !command_array.is_empty() {
                             eprintln!(
-                                "⚠️ Expected 0 values for command {:?}, got {}",
+                                "⚠️ Expected 0 arguments for command {:?}, got {}",
                                 command.name,
                                 command_array.len()
                             );
@@ -53,12 +46,12 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                             ));
                         }
                     }
-                    ValueType::Single => {
+                    ArgShape::Value => {
                         if command_array.len() == 1 {
-                            value = Some(vec![command_array.pop_back().unwrap()]);
+                            values = Some(vec![command_array.pop_back().unwrap()]);
                         } else {
                             eprintln!(
-                                "⚠️ Expected 1 value for command {:?}, got {}",
+                                "⚠️ Expected 1 argument for command {:?}, got {}",
                                 command.name,
                                 command_array.len()
                             );
@@ -68,14 +61,83 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                             ));
                         }
                     }
-                    ValueType::List => {
-                        value = Some(Vec::from(command_array));
+                    ArgShape::Key => {
+                        if command_array.len() == 1 {
+                            keys = Some(vec![
+                                parse_key(command_array.pop_back().unwrap())
+                                    .context("parsing key")?,
+                            ]);
+                        } else {
+                            eprintln!(
+                                "⚠️ Expected 1 argument for command {:?}, got {}",
+                                command.name,
+                                command_array.len()
+                            );
+                            return Err(anyhow!(
+                                "wrong number of arguments for '{}' command",
+                                command.name
+                            ));
+                        }
                     }
+                    ArgShape::KeyValue => {
+                        if command_array.len() == 2 {
+                            keys = Some(vec![
+                                parse_key(command_array.pop_front().unwrap())
+                                    .context("parsing key")?,
+                            ]);
+                            values = Some(vec![command_array.pop_back().unwrap()]);
+                        } else {
+                            eprintln!(
+                                "⚠️ Expected 2 arguments for command {:?}, got {}",
+                                command.name,
+                                command_array.len()
+                            );
+                            return Err(anyhow!(
+                                "wrong number of arguments for '{}' command",
+                                command.name
+                            ));
+                        }
+                    } // ValueType::List => {
+                    //     value = Some(Vec::from(command_array));
+                    // }
+                    ArgShape::MultipleKeys => {
+                        if !command_array.is_empty() {
+                            let (_, _keys) = parse_keys(command_array)?;
+                            keys = Some(_keys)
+                        } else {
+                            eprintln!(
+                                "⚠️ Expected 1+ arguments for command {:?}, got {}",
+                                command.name,
+                                command_array.len()
+                            );
+                            return Err(anyhow!(
+                                "wrong number of arguments for '{}' command",
+                                command.name
+                            ));
+                        }
+                    }
+                    ArgShape::KeyMultipleValues => {
+                        if command_array.len() >= 2 {
+                            keys = Some(vec![parse_key(command_array.pop_front().unwrap())?]);
+                            values = Some(Vec::from(command_array));
+                        } else {
+                            eprintln!(
+                                "⚠️ Expected 2+ arguments for command {:?}, got {}",
+                                command.name,
+                                command_array.len()
+                            );
+                            return Err(anyhow!(
+                                "wrong number of arguments for '{}' command",
+                                command.name
+                            ));
+                        }
+                    }
+                    ArgShape::Pairs => todo!(),
                 }
                 Ok(CommandArray {
                     command,
-                    key,
-                    values: value,
+                    keys,
+                    values,
                     ttl,
                 })
             } else {
@@ -92,6 +154,19 @@ fn parse_key(key: RESPValue) -> anyhow::Result<Arc<str>> {
     } else {
         Err(anyhow!("key must be a BulkString"))
     }
+}
+
+fn parse_keys(
+    mut command_array: VecDeque<RESPValue>,
+) -> anyhow::Result<(VecDeque<RESPValue>, Vec<Arc<str>>)> {
+    let mut keys = Vec::with_capacity(command_array.len());
+    while let Some(v) = command_array.pop_front() {
+        let RESPValue::BulkString(key) = v else {
+            return Err(anyhow!("key must be a BulkString"));
+        };
+        keys.push(Arc::<str>::from(key.to_owned()));
+    }
+    Ok((command_array, keys))
 }
 
 fn parse_ttl(

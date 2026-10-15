@@ -14,7 +14,7 @@ pub(crate) fn invoke(
     storage_mutex: &DbMutex,
     command_array: CommandArray,
 ) -> anyhow::Result<RESPValue> {
-    let key = command_array.key.unwrap();
+    let key = command_array.keys.unwrap().pop().unwrap();
 
     let values = command_array.values.unwrap();
 
