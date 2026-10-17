@@ -48,7 +48,7 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                     }
                     ArgShape::Value => {
                         if command_array.len() == 1 {
-                            values = Some(vec![command_array.pop_back().unwrap()]);
+                            values = Some(VecDeque::from([command_array.pop_back().unwrap()]));
                         } else {
                             eprintln!(
                                 "⚠️ Expected 1 argument for command {:?}, got {}",
@@ -85,7 +85,7 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                                 parse_key(command_array.pop_front().unwrap())
                                     .context("parsing key")?,
                             ]);
-                            values = Some(vec![command_array.pop_back().unwrap()]);
+                            values = Some(VecDeque::from([command_array.pop_back().unwrap()]));
                         } else {
                             eprintln!(
                                 "⚠️ Expected 2 arguments for command {:?}, got {}",
@@ -119,7 +119,7 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                     ArgShape::KeyMultipleValues => {
                         if command_array.len() >= 2 {
                             keys = Some(vec![parse_key(command_array.pop_front().unwrap())?]);
-                            values = Some(Vec::from(command_array));
+                            values = Some(command_array);
                         } else {
                             eprintln!(
                                 "⚠️ Expected 2+ arguments for command {:?}, got {}",

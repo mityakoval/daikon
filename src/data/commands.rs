@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 
 use crate::data::resp_types::RESPValue;
+use std::collections::VecDeque;
 use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -107,6 +108,6 @@ impl FromStr for Command {
 pub struct CommandArray {
     pub(crate) command: Command,
     pub(crate) keys: Option<Vec<Arc<str>>>,
-    pub(crate) values: Option<Vec<RESPValue>>,
+    pub(crate) values: Option<VecDeque<RESPValue>>,
     pub(crate) ttl: Option<Duration>,
 }
