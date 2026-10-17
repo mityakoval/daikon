@@ -24,7 +24,10 @@ pub(crate) fn invoke(
     for _ in 0..packs {
         let until = cmp::min(values.len(), LP_MAX_SIZE);
         let mut pack = BytesMut::new();
-        for v in values.drain(..until) {}
+        for v in values.drain(..until) {
+            if let Some(value) = 
+            pack.extend_from_slice();
+        }
     }
     let mut list: VecDeque<ListPack> = VecDeque::with_capacity(packs);
     Ok(RESPValue::Integer(1))
