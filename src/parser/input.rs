@@ -58,7 +58,7 @@ fn next_resp_chunk(bytes: &mut BytesMut) -> Option<(BytesMut, BytesMut)> {
     trace!("found potential chunk separator at: {}", chunk_sep_start);
     let next_byte = bytes.get(chunk_sep_start)?;
     // that's '\n'
-    if *next_byte == 13 {
+    if *next_byte == 10 {
         let chunk = (bytes).split_to(chunk_sep_start);
         trace!("chunk is: {:?}", chunk);
         assert_eq!(bytes.first(), Some(&b'\r'));
