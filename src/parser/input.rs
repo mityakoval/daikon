@@ -58,7 +58,7 @@ fn next_resp_chunk(bytes: &mut BytesMut) -> Option<(BytesMut, BytesMut)> {
     trace!("found potential chunk separator at: {}", chunk_sep_start);
     let next_byte = bytes.get(chunk_sep_start)?;
     // that's '\n'
-    if *next_byte == 10 {
+    if *next_byte == 13 {
         let chunk = (bytes).split_to(chunk_sep_start);
         trace!("chunk is: {:?}", chunk);
         assert_eq!(bytes.first(), Some(&b'\r'));
@@ -69,4 +69,17 @@ fn next_resp_chunk(bytes: &mut BytesMut) -> Option<(BytesMut, BytesMut)> {
     }
     trace!("no more chunks found");
     None
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_next_resp_chunk() {
+        let mut bytes = BytesMut::from("*1\r\n$3\r\nkey\r\n");
+        let (chunk, _rest) = next_resp_chunk(&mut bytes).unwrap();
+        assert_eq!(chunk.freeze().as_ref(), "*1".as_bytes())
+    }
 }
