@@ -1,7 +1,7 @@
 use crate::data::commands::{ArgShape, Command, CommandArray};
 use crate::data::resp_types::RESPValue;
 use crate::parser::input::parse_data_bytes;
-use anyhow::{Context, Error, anyhow};
+use anyhow::{Context, anyhow};
 use bytes::BytesMut;
 use std::collections::VecDeque;
 use std::str::FromStr;
@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<CommandArray> {
-    match parse_data_bytes(input).unwrap() {
+    match parse_data_bytes(input)?.unwrap() {
         (RESPValue::Array(mut command_array), _) => {
             trace!("Parsed array: {:?}", command_array);
 
@@ -144,7 +144,7 @@ pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<Comman
                 Err(anyhow!("command array empty or malformed"))
             }
         }
-        _ => Err(Error::msg("Command must be a RESP array")),
+        _ => Err(anyhow!("Command must be a RESP array")),
     }
 }
 
