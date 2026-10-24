@@ -1,3 +1,5 @@
+use std::str::Utf8Error;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -6,6 +8,8 @@ pub(crate) enum ParsingError {
     IncompleteRequest,
     #[error("recieved a malformed command")]
     MalformedRequest,
+    #[error("Non-UTF8 character found")]
+    BadEncoding(#[from] Utf8Error),
 }
 
 #[derive(Error, Debug)]

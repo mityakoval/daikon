@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<CommandArray> {
-    match parse_data_bytes(input)?.unwrap() {
+    match parse_data_bytes(0, input.iter().as_slice())?.unwrap() {
         (RESPValue::Array(mut command_array), _) => {
             trace!("Parsed array: {:?}", command_array);
 
