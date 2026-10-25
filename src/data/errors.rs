@@ -10,6 +10,8 @@ pub(crate) enum ParsingError {
     MalformedRequest,
     #[error("Non-UTF8 character found")]
     BadEncoding(#[from] Utf8Error),
+    #[error("invalid command")]
+    InvalidCommand(String),
 }
 
 #[derive(Error, Debug)]

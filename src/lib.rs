@@ -1,4 +1,5 @@
 use crate::data::commands::{CommandArray, CommandName};
+use crate::data::errors::ParsingError;
 use crate::data::resp_types::{RESPType, RESPValue};
 use crate::parser::commands::parse_command_array;
 use crate::storage::Storage;
@@ -52,7 +53,7 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
                         eprintln!("✅ Done!");
                         respond(&mut stream, result).await;
                     }
-                    Err(e) => {
+                    Err(ParsingError::IncompleteRequest) => {
                         eprintln!("⚠️ Error parsing command: {:#}", e);
                         stream
                             .write_all("-Unknown command\r\n".as_bytes())

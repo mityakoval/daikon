@@ -1,4 +1,5 @@
 use crate::data::commands::{ArgShape, Command, CommandArray};
+use crate::data::errors::ParsingError::{self, InvalidCommand};
 use crate::data::resp_types::RESPValue;
 use crate::parser::input::parse_data_bytes;
 use anyhow::{Context, anyhow};
@@ -8,7 +9,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub(crate) fn parse_command_array(input: &mut BytesMut) -> anyhow::Result<CommandArray> {
+pub(crate) fn parse_command_array(input: &mut BytesMut) -> Result<CommandArray, ParsingError> {
     match parse_data_bytes(input.iter().as_slice())?.unwrap() {
         (RESPValue::Array(mut command_array), _) => {
             trace!("Parsed array: {:?}", command_array);
@@ -171,7 +172,7 @@ fn parse_keys(
 
 fn parse_ttl(
     mut array: VecDeque<RESPValue>,
-) -> anyhow::Result<(VecDeque<RESPValue>, Option<Duration>)> {
+) -> Result<(VecDeque<RESPValue>, Option<Duration>), ParsingError> {
     let rem_len = array.len();
     if rem_len < 2 {
         return Ok((array, None));
@@ -188,7 +189,7 @@ fn parse_ttl(
                         let ttl = match ttl {
                             RESPValue::BulkString(ttl) => ttl.parse::<u64>()?,
                             _ => {
-                                return Err(anyhow!("Malformed ttl"));
+                                return Err(InvalidCommand("Malformed ttl".to_string()));
                             }
                         };
                         match units.to_uppercase().as_str() {
