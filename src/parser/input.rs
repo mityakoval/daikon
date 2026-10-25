@@ -5,10 +5,7 @@ use crate::data::{
     resp_types::RESPValue,
 };
 
-pub fn parse_data_bytes(
-    mut carret_pos: usize,
-    bytes: &[u8],
-) -> Result<Option<(RESPValue, &[u8])>, ParsingError> {
+pub fn parse_data_bytes(bytes: &[u8]) -> Result<Option<(RESPValue, &[u8])>, ParsingError> {
     let Some((sep_start, next_chunk_at)) = next_resp_separator(bytes)? else {
         return Ok(None);
     };
@@ -19,22 +16,24 @@ pub fn parse_data_bytes(
     }
 
     let mut rest = &bytes[next_chunk_at..];
-    trace!("\nparsing chunk: {:?}", chunk);
+    trace!("rest!!: {:?}", str::from_utf8(rest));
+    trace!("\nparsing chunk: {:?}", str::from_utf8(chunk));
     let mut chars = chunk.iter();
     match chars.next() {
         Some(b'$') => {
             // it's a BulkString
             if let Ok(length) = str::from_utf8(chars.as_slice()).unwrap().parse::<usize>() {
-                carret_pos += chars.len() + 1;
                 if rest.len() < length {
                     return Err(ParsingError::IncompleteRequest);
                 }
 
-                let chunk_end = carret_pos + length;
-
-                let potential_chunk = &rest[carret_pos..chunk_end];
+                let potential_chunk = &rest[..length];
 
                 if potential_chunk.contains(&b'\r') {
+                    trace!(
+                        "chunk contains a separator: {:?}",
+                        str::from_utf8(potential_chunk)
+                    );
                     return Err(ParsingError::MalformedRequest);
                 }
 
@@ -46,7 +45,7 @@ pub fn parse_data_bytes(
                 );
                 Ok(Some((
                     RESPValue::BulkString(content),
-                    &rest[(chunk_end + 1)..],
+                    &rest[(length + 2)..],
                 )))
             } else {
                 Err(ParsingError::MalformedRequest)
@@ -55,19 +54,19 @@ pub fn parse_data_bytes(
         Some(b'*') => {
             // it's a RESPArray
             if let Ok(length) = str::from_utf8(chars.as_slice()).unwrap().parse::<usize>() {
-                carret_pos += chars.len() + 1;
-
                 trace!("got a resp array of length: {}", length);
 
                 let mut array = VecDeque::with_capacity(length);
 
                 for i in 0..length {
                     trace!("parsing item {}", i);
-                    let Some((t, new_rest)) = parse_data_bytes(carret_pos, rest)? else {
+                    let Some((t, new_rest)) = parse_data_bytes(rest)? else {
                         return Err(IncompleteRequest);
                     };
+                    trace!("push {:?} to command array", t);
                     array.push_back(t);
                     rest = new_rest;
+                    trace!("new rest: {:?}", str::from_utf8(rest));
                 }
                 Ok(Some((RESPValue::Array(array), rest)))
             } else {
@@ -86,7 +85,7 @@ pub fn parse_data_bytes(
 }
 
 fn next_resp_separator(bytes: &[u8]) -> Result<Option<(usize, usize)>, ParsingError> {
-    trace!("\ngetting next chunk from: {:?}", bytes);
+    trace!("\ngetting next chunk from: {:?}", str::from_utf8(bytes));
     let Some(sep_start) = bytes.iter().position(|&x| x == b'\r') else {
         return Ok(None);
     };
@@ -103,7 +102,6 @@ fn next_resp_separator(bytes: &[u8]) -> Result<Option<(usize, usize)>, ParsingEr
     let remaining_buf = &bytes[next_chunk_start..];
     trace!("next chunk is at pos: {:?}", next_chunk_start);
 
-    trace!("rest is: {:?}", remaining_buf);
     assert_ne!(remaining_buf.first(), Some(&b'\r'));
 
     Ok(Some((sep_start, next_chunk_start)))
@@ -111,6 +109,8 @@ fn next_resp_separator(bytes: &[u8]) -> Result<Option<(usize, usize)>, ParsingEr
 
 #[cfg(test)]
 mod tests {
+
+    use std::assert_matches;
 
     use super::*;
 
@@ -142,30 +142,41 @@ mod tests {
         assert_eq!(next_chunk_at, 5);
     }
 
-    // #[test]
-    // fn test_parse_bulk_string() {
-    //     let mut bytes = BytesMut::from("$12\r\ni'm a string\r\n");
-    //
-    //     let (RESPValue::BulkString(value), rest) = parse_data_bytes(&mut bytes)
-    //         .expect("expected next chunk")
-    //         .unwrap()
-    //     else {
-    //         panic!("Expected BulkSting, got something else")
-    //     };
-    //
-    //     assert_eq!(value, "i'm a string".to_string());
-    //     assert!(rest.is_empty());
-    // }
-    //
-    // #[test]
-    // fn test_parse_incomplete_resp_array() {
-    //     let mut bytes = BytesMut::from(
-    //         "*12\r\n$5\r\nrpush\r\n$3\r\nkey\r\n$1\r\n1\r\n$1\r\n2\r\n$1\r\n3\r\n$1\r\n4\r\n$1\r\n5\r\n$1\r\n",
-    //     );
-    //
-    //     let result =
-    //         parse_data_bytes(&mut bytes).expect_err("expected ParsingError::IncompleteRequest");
-    //
-    //     assert_matches!(result, ParsingError::IncompleteRequest);
-    // }
+    #[test]
+    fn test_parse_bulk_string() {
+        let bytes = "$12\r\ni'm a string\r\n".as_bytes();
+
+        let (RESPValue::BulkString(value), rest) = parse_data_bytes(bytes)
+            .expect("expected next chunk")
+            .unwrap()
+        else {
+            panic!("Expected BulkSting, got something else")
+        };
+
+        assert_eq!(value, "i'm a string".to_string());
+        assert!(rest.is_empty());
+    }
+
+    #[test]
+    fn test_parse_incomplete_resp_array() {
+        let  bytes = "*12\r\n$5\r\nrpush\r\n$3\r\nkey\r\n$1\r\n1\r\n$1\r\n2\r\n$1\r\n3\r\n$1\r\n4\r\n$1\r\n5\r\n$1\r\n".as_bytes();
+        let result = parse_data_bytes(bytes).expect_err("expected ParsingError::IncompleteRequest");
+
+        assert_matches!(result, ParsingError::IncompleteRequest);
+    }
+
+    #[test]
+    fn test_parse_resp_array() {
+        let  bytes = "*8\r\n$5\r\nrpush\r\n$3\r\nkey\r\n$1\r\n1\r\n$1\r\n2\r\n$1\r\n3\r\n$1\r\n4\r\n$1\r\n5\r\n$1\r\n6\r\n".as_bytes();
+        let (value, _) = parse_data_bytes(bytes)
+            .expect("expected Ok result")
+            .unwrap();
+
+        let RESPValue::Array(vec) = value else {
+            panic!("Extected RESPArray")
+        };
+
+        assert_eq!(vec.len(), 8);
+        assert_eq!(vec[0], RESPValue::BulkString("rpush".to_string()));
+    }
 }

@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 
 use crate::data::resp_types::RESPValue;
 
-pub(crate) const LP_SEPARATOR: &'static str = "/r/n";
+pub(crate) const LP_SEPARATOR: &str = "/r/n";
 pub(crate) const LP_MAX_SIZE: usize = 10;
 
 #[derive(Debug, Clone)]
