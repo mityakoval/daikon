@@ -22,58 +22,46 @@ pub(crate) fn parse_command_array(input: &BytesMut) -> Result<CommandArray, Pars
                     CommandName::from_str(&command_bulk_str.to_uppercase().as_str())?;
                 let command = match command_name {
                     CommandName::Ping => {
-                        if !command_array.is_empty() {
-                            eprintln!(
-                                "⚠️ Expected 0 arguments for command {:?}, got {}",
-                                command_name,
-                                command_array.len()
-                            );
-                            return Err(ParsingError::InvalidCommand(
-                                "wrong number of arguments for '{}' command".to_string(),
-                            ));
-                        }
+                        require_empty(command_array, command_name)?;
                         Ok(Kommand::Ping)
                     }
                     CommandName::Echo => {
-                        if command_array.len() == 1 {
-                            let value = command_array.pop_back().unwrap();
-                            Ok(Kommand::Echo(value))
-                        } else {
-                            eprintln!(
-                                "⚠️ Expected 1 argument for command {:?}, got {}",
-                                command_name,
-                                command_array.len()
-                            );
-                             Err(InvalidCommand(format!(
-                                "wrong number of arguments for '{}' command",
-                                command_name
-                            )))
-                        }
-                    },
+                        let value = command_array.pop_back().unwrap();
+                        require_empty(command_array, command_name)?;
+                        Ok(Kommand::Echo(value))
+                    }
                     CommandName::Set => {
-                        if command_array.len() == 2 {
-                            let (_, ttl) = parse_ttl(&mut command_array)?;
-                            let key = parse_key(command_array.pop_front().unwrap())?;
-                            let value = command_array.pop_back().unwrap();
-                            Ok(Kommand::Set { key, value, ttl: ttl.expect("ttl must be here")  })
-                        } else {
-                            eprintln!(
-                                "⚠️ Expected 2 arguments for command {:?}, got {}",
-                                command_name,
-                                command_array.len()
-                            );
-                            Err(InvalidCommand(format!(
-                                "wrong number of arguments for '{}' command",
-                                command_name
-                            )))
-                        }
-                    },
+                        let (_, ttl) = parse_ttl(&mut command_array)?;
+                        let key = parse_key(command_array.pop_front().unwrap())?;
+                        let value = command_array.pop_back().unwrap();
+                        require_empty(command_array, command_name)?;
+                        Ok(Kommand::Set {
+                            key,
+                            value,
+                            ttl: ttl.expect("ttl must be here"),
+                        })
+                    }
                     CommandName::Get => {
-                        
-                    },
-                    CommandName::Del => todo!(),
-                    CommandName::Rpush => todo!(),
-                }
+                        let key = parse_key(command_array.pop_front().unwrap())?;
+                        require_empty(command_array, command_name)?;
+                        Ok(Kommand::Get(key))
+                    }
+                    CommandName::Del => {
+                        let (_, keys) = parse_keys(command_array)?;
+                        require_empty(command_array, command_name)?;
+                        Ok(Kommand::Del(keys))
+                    }
+                    CommandName::Rpush => {
+                        let (_, ttl) = parse_ttl(&mut command_array)?;
+                        let key = parse_key(command_array.pop_front().unwrap())?;
+                        let values = command_array;
+                        Ok(Kommand::Rpush {
+                            key,
+                            values,
+                            ttl: ttl.expect("ttl must be present"),
+                        })
+                    }
+                };
 
                 let command = Command::from_str(command_bulk_str.to_uppercase().as_str())?;
                 let mut keys = None;
@@ -215,9 +203,7 @@ fn parse_keys(
     Ok((command_array, keys))
 }
 
-fn parse_ttl(
-     array: &mut VecDeque<RespValue>,
-) -> Result<(VecDeque<RespValue>, Option<Duration>), ParsingError> {
+fn parse_ttl(array: &mut VecDeque<RespValue>) -> Result<Duration, ParsingError> {
     let rem_len = array.len();
     if rem_len < 2 {
         return Ok((array, None));
@@ -255,4 +241,15 @@ fn parse_ttl(
     }
 }
 
-fn require_empty(array: VecDeque<RespValue>) -> Result<(), ParsingError> {}
+fn require_empty(
+    array: VecDeque<RespValue>,
+    command_name: CommandName,
+) -> Result<(), ParsingError> {
+    if !array.is_empty() {
+        return Err(ParsingError::InvalidCommand(format!(
+            "wrong number of arguments for '{}' command",
+            command_name
+        )));
+    }
+    Ok(())
+}

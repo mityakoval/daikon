@@ -15,7 +15,7 @@ pub(crate) enum Kommand {
         ttl: Duration,
     },
     Get(Arc<str>),
-    Del(Arc<str>),
+    Del(Vec<Arc<str>>),
     Rpush {
         key: Arc<str>,
         values: VecDeque<RespValue>,
