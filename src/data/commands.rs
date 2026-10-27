@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 
+use crate::data::errors::ParsingError::{self, InvalidCommand};
 use crate::data::resp_types::RESPValue;
 use std::collections::VecDeque;
 use std::fmt::Display;
@@ -54,7 +55,7 @@ pub(crate) struct Command {
 }
 
 impl FromStr for Command {
-    type Err = anyhow::Error;
+    type Err = ParsingError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "PING" => Ok(Command {
@@ -99,7 +100,7 @@ impl FromStr for Command {
                     args: ArgShape::KeyMultipleValues,
                 },
             }),
-            _ => Err(anyhow!("Unknown command '{}'", s)),
+            _ => Err(InvalidCommand(format!("Unknown command '{}'", s))),
         }
     }
 }

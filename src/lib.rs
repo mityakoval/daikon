@@ -42,7 +42,7 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
                 eprintln!("\n🔵 Incoming request");
                 trace!("Buffer: {:?}", buf);
 
-                match parse_command_array(&mut buf) {
+                match parse_command_array(&buf) {
                     Ok(command_array) => {
                         eprintln!(
                             "🔹 Received command: '{}'\n🔄 Executing...",
@@ -54,6 +54,9 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
                         respond(&mut stream, result).await;
                     }
                     Err(ParsingError::IncompleteRequest) => {
+                        eprintln!("⚠️ Error parsing command: INCOMPLETE");
+                    }
+                    Err(e) => {
                         eprintln!("⚠️ Error parsing command: {:#}", e);
                         stream
                             .write_all("-Unknown command\r\n".as_bytes())
