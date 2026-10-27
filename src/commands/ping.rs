@@ -1,5 +1,5 @@
-use crate::data::resp_types::RESPValue;
+use crate::data::resp_types::RespValue;
 
-pub(crate) fn invoke() -> RESPValue {
-    RESPValue::SimpleString("PONG".into())
+pub(crate) fn invoke() -> RespValue {
+    RespValue::SimpleString("PONG".into())
 }

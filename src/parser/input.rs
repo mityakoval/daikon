@@ -2,10 +2,10 @@ use std::collections::VecDeque;
 
 use crate::data::{
     errors::ParsingError::{self, IncompleteRequest, MalformedRequest},
-    resp_types::RESPValue,
+    resp_types::RespValue,
 };
 
-pub fn parse_data_bytes(bytes: &[u8]) -> Result<Option<(RESPValue, &[u8])>, ParsingError> {
+pub fn parse_data_bytes(bytes: &[u8]) -> Result<Option<(RespValue, &[u8])>, ParsingError> {
     let Some((sep_start, next_chunk_at)) = next_resp_separator(bytes)? else {
         return Ok(None);
     };
@@ -44,7 +44,7 @@ pub fn parse_data_bytes(bytes: &[u8]) -> Result<Option<(RESPValue, &[u8])>, Pars
                     length
                 );
                 Ok(Some((
-                    RESPValue::BulkString(content),
+                    RespValue::BulkString(content),
                     &rest[(length + 2)..],
                 )))
             } else {
@@ -68,7 +68,7 @@ pub fn parse_data_bytes(bytes: &[u8]) -> Result<Option<(RESPValue, &[u8])>, Pars
                     rest = new_rest;
                     trace!("new rest: {:?}", str::from_utf8(rest));
                 }
-                Ok(Some((RESPValue::Array(array), rest)))
+                Ok(Some((RespValue::Array(array), rest)))
             } else {
                 Err(MalformedRequest)
             }
@@ -146,7 +146,7 @@ mod tests {
     fn test_parse_bulk_string() {
         let bytes = "$12\r\ni'm a string\r\n".as_bytes();
 
-        let (RESPValue::BulkString(value), rest) = parse_data_bytes(bytes)
+        let (RespValue::BulkString(value), rest) = parse_data_bytes(bytes)
             .expect("expected next chunk")
             .unwrap()
         else {
@@ -172,11 +172,11 @@ mod tests {
             .expect("expected Ok result")
             .unwrap();
 
-        let RESPValue::Array(vec) = value else {
-            panic!("Extected RESPArray")
+        let RespValue::Array(vec) = value else {
+            panic!("Extected RespArray")
         };
 
         assert_eq!(vec.len(), 8);
-        assert_eq!(vec[0], RESPValue::BulkString("rpush".to_string()));
+        assert_eq!(vec[0], RespValue::BulkString("rpush".to_string()));
     }
 }

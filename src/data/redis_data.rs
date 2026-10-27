@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use std::collections::VecDeque;
 
-use crate::data::resp_types::RESPValue;
+use crate::data::resp_types::RespValue;
 
 pub(crate) const LP_SEPARATOR: &str = "/r/n";
 pub(crate) const LP_MAX_SIZE: usize = 10;
@@ -19,12 +19,12 @@ pub enum RedisData {
 }
 
 impl RedisData {
-    pub(crate) fn to_resp_value(&self) -> RESPValue {
+    pub(crate) fn to_resp_value(&self) -> RespValue {
         match self {
             RedisData::String(bytes) => {
-                RESPValue::BulkString(String::from_utf8(bytes.to_vec()).unwrap())
+                RespValue::BulkString(String::from_utf8(bytes.to_vec()).unwrap())
             }
-            _ => RESPValue::Err("".into()),
+            _ => RespValue::Err("".into()),
         }
     }
 }

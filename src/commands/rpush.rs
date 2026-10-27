@@ -9,14 +9,14 @@ use crate::{
     data::{
         commands::CommandArray,
         redis_data::{LP_MAX_SIZE, LP_SEPARATOR, ListPack, RedisData},
-        resp_types::{RESPValue, StoredValue},
+        resp_types::{RespValue, StoredValue},
     },
 };
 
 pub(crate) fn invoke(
     storage_mut: &DbMutex,
     command_array: CommandArray,
-) -> anyhow::Result<RESPValue> {
+) -> anyhow::Result<RespValue> {
     let mut values = command_array.values.unwrap();
     let r = values.len() % LP_MAX_SIZE;
     let mut packs = values.len() / LP_MAX_SIZE;
@@ -28,7 +28,7 @@ pub(crate) fn invoke(
         let until = cmp::min(values.len(), LP_MAX_SIZE);
         let mut pack = BytesMut::new();
         for v in values.drain(..until) {
-            let RESPValue::BulkString(string) = v else {
+            let RespValue::BulkString(string) = v else {
                 debug!("RPUSH: Not a bulk string");
                 return Err(anyhow!("wrong argument provided"));
             };
@@ -50,5 +50,5 @@ pub(crate) fn invoke(
         );
     }
 
-    Ok(RESPValue::Integer(values.len() as i64))
+    Ok(RespValue::Integer(values.len() as i64))
 }

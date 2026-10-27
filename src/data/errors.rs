@@ -14,6 +14,8 @@ pub(crate) enum ParsingError {
     InvalidCommand(String),
     #[error("value is not an integer or out of range")]
     NotAnInt(#[from] ParseIntError),
+    #[error("unknown command")]
+    UnknownCommand,
 }
 
 #[derive(Error, Debug)]

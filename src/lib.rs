@@ -1,6 +1,6 @@
 use crate::data::commands::{CommandArray, CommandName};
 use crate::data::errors::ParsingError;
-use crate::data::resp_types::{RESPType, RESPValue};
+use crate::data::resp_types::{RespType, RespValue};
 use crate::parser::commands::parse_command_array;
 use crate::storage::Storage;
 use bytes::BytesMut;
@@ -75,20 +75,20 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
     }
 }
 
-fn execute_command(command_array: CommandArray, storage: &DbMutex) -> anyhow::Result<RESPValue> {
+fn execute_command(command_array: CommandArray, storage: &DbMutex) -> anyhow::Result<RespValue> {
     match command_array.command.name {
         CommandName::Ping => Ok(commands::ping::invoke()),
         CommandName::Echo => commands::echo::invoke(command_array),
         CommandName::Set => commands::set::invoke(storage, command_array),
         CommandName::Get => commands::get::invoke(storage, command_array),
-        CommandName::RPush => commands::rpush::invoke(storage, command_array),
+        CommandName::Rpush => commands::rpush::invoke(storage, command_array),
         CommandName::Del => commands::del::invoke(storage, command_array),
     }
 }
 
 async fn respond<V>(stream: &mut TcpStream, mut value: V)
 where
-    V: RESPType,
+    V: RespType,
 {
     match stream.write_buf(&mut value.encode()).await {
         Ok(_) => (),

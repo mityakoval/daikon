@@ -2,13 +2,13 @@ use std::ops::Add;
 
 use crate::{
     DbMutex,
-    data::{commands::CommandArray, resp_types::RESPValue},
+    data::{commands::CommandArray, resp_types::RespValue},
 };
 
 pub(crate) fn invoke(
     storage_mutex: &DbMutex,
     command_array: CommandArray,
-) -> anyhow::Result<RESPValue> {
+) -> anyhow::Result<RespValue> {
     if let Ok(mut storage) = storage_mutex.lock() {
         let removed = command_array.keys.unwrap().iter().fold(0i64, |acc, k| {
             if storage.get_live(k).is_some() {
@@ -19,8 +19,8 @@ pub(crate) fn invoke(
                 acc.add(0)
             }
         });
-        Ok(RESPValue::Integer(removed))
+        Ok(RespValue::Integer(removed))
     } else {
-        Ok(RESPValue::Err("Internal error occured".to_string()))
+        Ok(RespValue::Err("Internal error occured".to_string()))
     }
 }

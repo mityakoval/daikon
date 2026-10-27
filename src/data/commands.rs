@@ -1,12 +1,27 @@
-use anyhow::anyhow;
-
 use crate::data::errors::ParsingError::{self, InvalidCommand};
-use crate::data::resp_types::RESPValue;
+use crate::data::resp_types::RespValue;
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+
+pub(crate) enum Kommand {
+    Ping,
+    Echo(RespValue),
+    Set {
+        key: Arc<str>,
+        value: RespValue,
+        ttl: Duration,
+    },
+    Get(Arc<str>),
+    Del(Arc<str>),
+    Rpush {
+        key: Arc<str>,
+        values: VecDeque<RespValue>,
+        ttl: Duration,
+    },
+}
 
 #[derive(Debug)]
 pub(crate) enum ArgShape {
@@ -39,7 +54,22 @@ pub enum CommandName {
     Set,
     Get,
     Del,
-    RPush,
+    Rpush,
+}
+impl FromStr for CommandName {
+    type Err = ParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "PING" => Ok(CommandName::Ping),
+            "ECHO" => Ok(CommandName::Echo),
+            "SET" => Ok(CommandName::Set),
+            "GET" => Ok(CommandName::Get),
+            "DEL" => Ok(CommandName::Del),
+            "RPUSH" => Ok(CommandName::Rpush),
+            _ => Err(ParsingError::UnknownCommand),
+        }
+    }
 }
 
 impl Display for CommandName {
@@ -94,7 +124,7 @@ impl FromStr for Command {
                 },
             }),
             "RPUSH" => Ok(Command {
-                name: CommandName::RPush,
+                name: CommandName::Rpush,
                 rules: CommandRules {
                     allows_ttl: true,
                     args: ArgShape::KeyMultipleValues,
@@ -109,6 +139,6 @@ impl FromStr for Command {
 pub struct CommandArray {
     pub(crate) command: Command,
     pub(crate) keys: Option<Vec<Arc<str>>>,
-    pub(crate) values: Option<VecDeque<RESPValue>>,
+    pub(crate) values: Option<VecDeque<RespValue>>,
     pub(crate) ttl: Option<Duration>,
 }
