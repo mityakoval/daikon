@@ -172,9 +172,9 @@ fn parse_ttl(
                 match units {
                     RESPValue::BulkString(units) => {
                         let RESPValue::BulkString(ttl) = ttl else {
-                            return Err(InvalidCommand(format!(
-                                "value is not an integer or out of range"
-                            )));
+                            return Err(InvalidCommand(
+                                "value is not an integer or out of range".to_string(),
+                            ));
                         };
 
                         let ttl = ttl.parse::<u64>()?;

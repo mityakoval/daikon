@@ -52,9 +52,10 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
                         let result = execute_command(command_array, &db_mutex).unwrap();
                         eprintln!("✅ Done!");
                         respond(&mut stream, result).await;
+                        buf.clear();
                     }
                     Err(ParsingError::IncompleteRequest) => {
-                        eprintln!("⚠️ Error parsing command: INCOMPLETE");
+                        eprintln!("⚠️ Error parsing command: INCOMPLETE REQUEST");
                     }
                     Err(e) => {
                         eprintln!("⚠️ Error parsing command: {:#}", e);
@@ -62,6 +63,7 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
                             .write_all("-Unknown command\r\n".as_bytes())
                             .await
                             .expect("Could not send error");
+                        buf.clear();
                     }
                 }
             }
