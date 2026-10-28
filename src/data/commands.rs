@@ -1,4 +1,4 @@
-use crate::data::errors::ParsingError::{self, InvalidCommand};
+use crate::data::errors::ParsingError;
 use crate::data::resp_types::RespValue;
 use std::collections::VecDeque;
 use std::fmt::Display;
@@ -6,45 +6,38 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[derive(Debug)]
 pub(crate) enum Kommand {
     Ping,
     Echo(RespValue),
     Set {
         key: Arc<str>,
         value: RespValue,
-        ttl: Duration,
+        ttl: Option<Duration>,
     },
     Get(Arc<str>),
     Del(Vec<Arc<str>>),
     Rpush {
         key: Arc<str>,
         values: VecDeque<RespValue>,
-        ttl: Duration,
     },
 }
 
-#[derive(Debug)]
-pub(crate) enum ArgShape {
-    None,
-    Value,
-    Key,
-    MultipleKeys,
-    KeyValue,
-    KeyMultipleValues,
-    Pairs,
-}
-
-#[derive(Debug)]
-pub(crate) enum KeyType {
-    None,
-    Single,
-    List,
-}
-
-#[derive(Debug)]
-pub(crate) struct CommandRules {
-    pub(crate) allows_ttl: bool,
-    pub(crate) args: ArgShape,
+impl Display for Kommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Kommand::Ping => CommandName::Ping.fmt(f),
+            Kommand::Echo(_) => CommandName::Echo.fmt(f),
+            Kommand::Set {
+                key: _,
+                value: _,
+                ttl: _,
+            } => CommandName::Set.fmt(f),
+            Kommand::Get(_) => CommandName::Get.fmt(f),
+            Kommand::Del(_) => CommandName::Del.fmt(f),
+            Kommand::Rpush { key: _, values: _ } => CommandName::Rpush.fmt(f),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -76,69 +69,4 @@ impl Display for CommandName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", format!("{self:?}").to_lowercase())
     }
-}
-
-#[derive(Debug)]
-pub(crate) struct Command {
-    pub(crate) name: CommandName,
-    pub(crate) rules: CommandRules,
-}
-
-impl FromStr for Command {
-    type Err = ParsingError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "PING" => Ok(Command {
-                name: CommandName::Ping,
-                rules: CommandRules {
-                    allows_ttl: false,
-                    args: ArgShape::None,
-                },
-            }),
-            "ECHO" => Ok(Command {
-                name: CommandName::Echo,
-                rules: CommandRules {
-                    allows_ttl: false,
-                    args: ArgShape::Value,
-                },
-            }),
-            "SET" => Ok(Command {
-                name: CommandName::Set,
-                rules: CommandRules {
-                    allows_ttl: true,
-                    args: ArgShape::KeyValue,
-                },
-            }),
-            "GET" => Ok(Command {
-                name: CommandName::Get,
-                rules: CommandRules {
-                    allows_ttl: false,
-                    args: ArgShape::Key,
-                },
-            }),
-            "DEL" => Ok(Command {
-                name: CommandName::Del,
-                rules: CommandRules {
-                    allows_ttl: false,
-                    args: ArgShape::MultipleKeys,
-                },
-            }),
-            "RPUSH" => Ok(Command {
-                name: CommandName::Rpush,
-                rules: CommandRules {
-                    allows_ttl: true,
-                    args: ArgShape::KeyMultipleValues,
-                },
-            }),
-            _ => Err(InvalidCommand(format!("Unknown command '{}'", s))),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct CommandArray {
-    pub(crate) command: Command,
-    pub(crate) keys: Option<Vec<Arc<str>>>,
-    pub(crate) values: Option<VecDeque<RespValue>>,
-    pub(crate) ttl: Option<Duration>,
 }

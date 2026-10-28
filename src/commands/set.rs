@@ -1,24 +1,19 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 
 use crate::data::redis_data::RedisData;
 use crate::data::resp_types::RespValue::{self, Err, SimpleString};
-use crate::{
-    DbMutex,
-    data::{commands::CommandArray, resp_types::StoredValue},
-};
+use crate::{DbMutex, data::resp_types::StoredValue};
 
 pub(crate) fn invoke(
     storage_mutex: &DbMutex,
-    command_array: CommandArray,
+    key: Arc<str>,
+    value: RespValue,
+    ttl: Option<Duration>,
 ) -> anyhow::Result<RespValue> {
-    let key = command_array.keys.unwrap().pop().unwrap();
-
-    let values = command_array.values.unwrap();
-
-    let Some(RespValue::BulkString(value)) = values.into_iter().next() else {
+    let RespValue::BulkString(value) = value else {
         return Ok(Err("Value cannot be stored".into()));
     };
 
@@ -31,8 +26,8 @@ pub(crate) fn invoke(
     storage
         .data
         .insert(Arc::clone(&key), StoredValue { value: redis_data });
-    if let Some(expiration) = command_array.ttl.map(|ttl| Instant::now() + ttl) {
-        debug!("Setting ttl {:?}", &command_array.ttl);
+    if let Some(expiration) = ttl.map(|ttl| Instant::now() + ttl) {
+        debug!("Setting ttl {:?}", ttl);
         storage.expiry.insert(Arc::clone(&key), expiration);
     } else {
         storage.expiry.remove(&key);

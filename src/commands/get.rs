@@ -1,13 +1,8 @@
-use crate::{
-    DbMutex,
-    data::{commands::CommandArray, resp_types::RespValue},
-};
+use std::sync::Arc;
 
-pub(crate) fn invoke(
-    storage_mutex: &DbMutex,
-    command_array: CommandArray,
-) -> anyhow::Result<RespValue> {
-    let key = command_array.keys.unwrap().pop().unwrap();
+use crate::{DbMutex, data::resp_types::RespValue};
+
+pub(crate) fn invoke(storage_mutex: &DbMutex, key: Arc<str>) -> anyhow::Result<RespValue> {
     if let Ok(mut storage) = storage_mutex.lock() {
         if let Some(entry) = storage.get_live(&key) {
             return Ok(entry.value.to_resp_value());

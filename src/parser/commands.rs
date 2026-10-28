@@ -1,8 +1,5 @@
-use crate::data::commands::{ArgShape, Kommand};
-use crate::data::commands::{
-    Command, CommandArray,
-    CommandName::{self},
-};
+use crate::data::commands::CommandName::{self};
+use crate::data::commands::Kommand;
 use crate::data::errors::ParsingError::{self, InvalidCommand, MalformedRequest};
 use crate::data::resp_types::RespValue;
 use crate::parser::input::parse_data_bytes;
@@ -12,15 +9,14 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub(crate) fn parse_command_array(input: &BytesMut) -> Result<CommandArray, ParsingError> {
+pub(crate) fn parse_command_array(input: &BytesMut) -> Result<Kommand, ParsingError> {
     match parse_data_bytes(input.iter().as_slice())?.unwrap() {
         (RespValue::Array(mut command_array), _) => {
             trace!("Parsed array: {:?}", command_array);
 
             if let Some(RespValue::BulkString(command_bulk_str)) = command_array.pop_front() {
-                let command_name =
-                    CommandName::from_str(&command_bulk_str.to_uppercase().as_str())?;
-                let command = match command_name {
+                let command_name = CommandName::from_str(command_bulk_str.to_uppercase().as_str())?;
+                match command_name {
                     CommandName::Ping => {
                         require_empty(command_array, command_name)?;
                         Ok(Kommand::Ping)
@@ -31,15 +27,11 @@ pub(crate) fn parse_command_array(input: &BytesMut) -> Result<CommandArray, Pars
                         Ok(Kommand::Echo(value))
                     }
                     CommandName::Set => {
-                        let (_, ttl) = parse_ttl(&mut command_array)?;
+                        let ttl = parse_ttl(&mut command_array)?;
                         let key = parse_key(command_array.pop_front().unwrap())?;
                         let value = command_array.pop_back().unwrap();
                         require_empty(command_array, command_name)?;
-                        Ok(Kommand::Set {
-                            key,
-                            value,
-                            ttl: ttl.expect("ttl must be here"),
-                        })
+                        Ok(Kommand::Set { key, value, ttl })
                     }
                     CommandName::Get => {
                         let key = parse_key(command_array.pop_front().unwrap())?;
@@ -47,133 +39,16 @@ pub(crate) fn parse_command_array(input: &BytesMut) -> Result<CommandArray, Pars
                         Ok(Kommand::Get(key))
                     }
                     CommandName::Del => {
-                        let (_, keys) = parse_keys(command_array)?;
+                        let keys = parse_keys(&mut command_array)?;
                         require_empty(command_array, command_name)?;
                         Ok(Kommand::Del(keys))
                     }
                     CommandName::Rpush => {
-                        let (_, ttl) = parse_ttl(&mut command_array)?;
                         let key = parse_key(command_array.pop_front().unwrap())?;
                         let values = command_array;
-                        Ok(Kommand::Rpush {
-                            key,
-                            values,
-                            ttl: ttl.expect("ttl must be present"),
-                        })
+                        Ok(Kommand::Rpush { key, values })
                     }
-                };
-
-                let command = Command::from_str(command_bulk_str.to_uppercase().as_str())?;
-                let mut keys = None;
-                let mut values = None;
-                let mut ttl = None;
-
-                if command.rules.allows_ttl {
-                    let (remaining_array, _ttl) = parse_ttl(command_array)?;
-                    ttl = _ttl;
-                    command_array = remaining_array;
                 }
-
-                match command.rules.args {
-                    ArgShape::None => {
-                        if !command_array.is_empty() {
-                            eprintln!(
-                                "⚠️ Expected 0 arguments for command {:?}, got {}",
-                                command.name,
-                                command_array.len()
-                            );
-                            return Err(InvalidCommand(format!(
-                                "wrong number of arguments for '{}' command",
-                                command.name
-                            )));
-                        }
-                    }
-                    ArgShape::Value => {
-                        if command_array.len() == 1 {
-                            values = Some(VecDeque::from([command_array.pop_back().unwrap()]));
-                        } else {
-                            eprintln!(
-                                "⚠️ Expected 1 argument for command {:?}, got {}",
-                                command.name,
-                                command_array.len()
-                            );
-                            return Err(InvalidCommand(format!(
-                                "wrong number of arguments for '{}' command",
-                                command.name
-                            )));
-                        }
-                    }
-                    ArgShape::Key => {
-                        if command_array.len() == 1 {
-                            keys = Some(vec![parse_key(command_array.pop_back().unwrap())?]);
-                        } else {
-                            eprintln!(
-                                "⚠️ Expected 1 argument for command {:?}, got {}",
-                                command.name,
-                                command_array.len()
-                            );
-                            return Err(InvalidCommand(format!(
-                                "wrong number of arguments for '{}' command",
-                                command.name
-                            )));
-                        }
-                    }
-                    ArgShape::KeyValue => {
-                        if command_array.len() == 2 {
-                            keys = Some(vec![parse_key(command_array.pop_front().unwrap())?]);
-                            values = Some(VecDeque::from([command_array.pop_back().unwrap()]));
-                        } else {
-                            eprintln!(
-                                "⚠️ Expected 2 arguments for command {:?}, got {}",
-                                command.name,
-                                command_array.len()
-                            );
-                            return Err(InvalidCommand(format!(
-                                "wrong number of arguments for '{}' command",
-                                command.name
-                            )));
-                        }
-                    }
-                    ArgShape::MultipleKeys => {
-                        if !command_array.is_empty() {
-                            let (_, _keys) = parse_keys(command_array)?;
-                            keys = Some(_keys)
-                        } else {
-                            eprintln!(
-                                "⚠️ Expected 1+ arguments for command {:?}, got {}",
-                                command.name,
-                                command_array.len()
-                            );
-                            return Err(InvalidCommand(format!(
-                                "wrong number of arguments for '{}' command",
-                                command.name
-                            )));
-                        }
-                    }
-                    ArgShape::KeyMultipleValues => {
-                        if command_array.len() >= 2 {
-                            keys = Some(vec![parse_key(command_array.pop_front().unwrap())?]);
-                            values = Some(command_array);
-                        } else {
-                            eprintln!(
-                                "⚠️ Expected 2+ arguments for command {:?}, got {}",
-                                command.name,
-                                command_array.len()
-                            );
-                            return Err(InvalidCommand(format!(
-                                "wrong number of arguments for '{}' command",
-                                command.name
-                            )));
-                        }
-                    }
-                    ArgShape::Pairs => todo!(),
-                }
-                Ok(CommandArray {
-                    command,
-                    keys,
-                    values,
-                    ttl,
-                })
             } else {
                 Err(MalformedRequest)
             }
@@ -190,9 +65,7 @@ fn parse_key(key: RespValue) -> Result<Arc<str>, ParsingError> {
     }
 }
 
-fn parse_keys(
-    mut command_array: VecDeque<RespValue>,
-) -> Result<(VecDeque<RespValue>, Vec<Arc<str>>), ParsingError> {
+fn parse_keys(command_array: &mut VecDeque<RespValue>) -> Result<Vec<Arc<str>>, ParsingError> {
     let mut keys = Vec::with_capacity(command_array.len());
     while let Some(v) = command_array.pop_front() {
         let RespValue::BulkString(key) = v else {
@@ -200,13 +73,13 @@ fn parse_keys(
         };
         keys.push(Arc::<str>::from(key.to_owned()));
     }
-    Ok((command_array, keys))
+    Ok(keys)
 }
 
-fn parse_ttl(array: &mut VecDeque<RespValue>) -> Result<Duration, ParsingError> {
+fn parse_ttl(array: &mut VecDeque<RespValue>) -> Result<Option<Duration>, ParsingError> {
     let rem_len = array.len();
     if rem_len < 2 {
-        return Ok((array, None));
+        return Ok(None);
     }
     let ttl;
     let units;
@@ -226,18 +99,18 @@ fn parse_ttl(array: &mut VecDeque<RespValue>) -> Result<Duration, ParsingError> 
                         let ttl = ttl.parse::<u64>()?;
 
                         match units.to_uppercase().as_str() {
-                            "EX" => Ok((array, Some(Duration::from_secs(ttl)))),
-                            "PX" => Ok((array, Some(Duration::from_millis(ttl)))),
+                            "EX" => Ok(Some(Duration::from_secs(ttl))),
+                            "PX" => Ok(Some(Duration::from_millis(ttl))),
                             _ => Err(MalformedRequest),
                         }
                     }
                     _ => Err(MalformedRequest),
                 }
             } else {
-                Ok((array, None))
+                Ok(None)
             }
         }
-        _ => Ok((array, None)),
+        _ => Ok(None),
     }
 }
 

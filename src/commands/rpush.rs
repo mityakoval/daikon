@@ -1,4 +1,4 @@
-use std::{cmp, collections::VecDeque};
+use std::{cmp, collections::VecDeque, sync::Arc};
 
 use anyhow::anyhow;
 
@@ -7,7 +7,6 @@ use bytes::BytesMut;
 use crate::{
     DbMutex,
     data::{
-        commands::CommandArray,
         redis_data::{LP_MAX_SIZE, LP_SEPARATOR, ListPack, RedisData},
         resp_types::{RespValue, StoredValue},
     },
@@ -15,17 +14,18 @@ use crate::{
 
 pub(crate) fn invoke(
     storage_mut: &DbMutex,
-    command_array: CommandArray,
+    key: Arc<str>,
+    values: &mut VecDeque<RespValue>,
 ) -> anyhow::Result<RespValue> {
-    let mut values = command_array.values.unwrap();
-    let r = values.len() % LP_MAX_SIZE;
-    let mut packs = values.len() / LP_MAX_SIZE;
+    let len = values.len();
+    let r = len % LP_MAX_SIZE;
+    let mut packs = len / LP_MAX_SIZE;
     if r != 0 {
         packs += 1;
     }
     let mut list: VecDeque<ListPack> = VecDeque::with_capacity(packs);
     for _ in 0..packs {
-        let until = cmp::min(values.len(), LP_MAX_SIZE);
+        let until = cmp::min(len, LP_MAX_SIZE);
         let mut pack = BytesMut::new();
         for v in values.drain(..until) {
             let RespValue::BulkString(string) = v else {
@@ -40,7 +40,6 @@ pub(crate) fn invoke(
             data: pack.freeze(),
         });
     }
-    let key = command_array.keys.unwrap().pop().unwrap();
     if let Ok(mut storage) = storage_mut.lock() {
         storage.data.insert(
             key,
@@ -50,5 +49,5 @@ pub(crate) fn invoke(
         );
     }
 
-    Ok(RespValue::Integer(values.len() as i64))
+    Ok(RespValue::Integer(len as i64))
 }

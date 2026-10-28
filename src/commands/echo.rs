@@ -1,13 +1,10 @@
 use anyhow::Ok;
 
-use crate::data::{
-    commands::CommandArray,
-    resp_types::RespValue::{self, Err},
-};
+use crate::data::resp_types::RespValue::{self, Err};
 
-pub(crate) fn invoke(command_array: CommandArray) -> anyhow::Result<RespValue> {
-    match command_array.values.unwrap().into_iter().next() {
-        Some(RespValue::BulkString(value)) => Ok(RespValue::SimpleString(value)),
+pub(crate) fn invoke(value: RespValue) -> anyhow::Result<RespValue> {
+    match value {
+        RespValue::BulkString(value) => Ok(RespValue::SimpleString(value)),
         _ => Ok(Err("Malformed arguments for command 'echo'".into())),
     }
 }

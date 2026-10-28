@@ -3,7 +3,7 @@ use std::{num::ParseIntError, str::Utf8Error};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub(crate) enum ParsingError {
+pub enum ParsingError {
     #[error("command array ended unexpectedly")]
     IncompleteRequest,
     #[error("syntax error")]
@@ -23,5 +23,3 @@ pub(crate) enum DaikonError {
     #[error(transparent)]
     Parsing(#[from] ParsingError),
 }
-
-pub(crate) type Result<T> = std::result::Result<T, DaikonError>;

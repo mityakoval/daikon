@@ -1,4 +1,4 @@
-use crate::data::commands::{CommandArray, CommandName};
+use crate::data::commands::Kommand;
 use crate::data::errors::ParsingError;
 use crate::data::resp_types::{RespType, RespValue};
 use crate::parser::commands::parse_command_array;
@@ -43,13 +43,10 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
                 trace!("Buffer: {:?}", buf);
 
                 match parse_command_array(&buf) {
-                    Ok(command_array) => {
-                        eprintln!(
-                            "🔹 Received command: '{}'\n🔄 Executing...",
-                            command_array.command.name
-                        );
-                        trace!("🔸 Command array: {:?}", command_array);
-                        let result = execute_command(command_array, &db_mutex).unwrap();
+                    Ok(command) => {
+                        eprintln!("🔹 Received command: '{}'\n🔄 Executing...", command);
+                        trace!("🔸 Command array: {:?}", command);
+                        let result = execute_command(command, &db_mutex).unwrap();
                         eprintln!("✅ Done!");
                         respond(&mut stream, result).await;
                         buf.clear();
@@ -75,14 +72,14 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
     }
 }
 
-fn execute_command(command_array: CommandArray, storage: &DbMutex) -> anyhow::Result<RespValue> {
-    match command_array.command.name {
-        CommandName::Ping => Ok(commands::ping::invoke()),
-        CommandName::Echo => commands::echo::invoke(command_array),
-        CommandName::Set => commands::set::invoke(storage, command_array),
-        CommandName::Get => commands::get::invoke(storage, command_array),
-        CommandName::Rpush => commands::rpush::invoke(storage, command_array),
-        CommandName::Del => commands::del::invoke(storage, command_array),
+fn execute_command(command: Kommand, storage: &DbMutex) -> anyhow::Result<RespValue> {
+    match command {
+        Kommand::Ping => Ok(commands::ping::invoke()),
+        Kommand::Echo(value) => commands::echo::invoke(value),
+        Kommand::Set { key, value, ttl } => commands::set::invoke(storage, key, value, ttl),
+        Kommand::Get(key) => commands::get::invoke(storage, key),
+        Kommand::Rpush { key, mut values } => commands::rpush::invoke(storage, key, &mut values),
+        Kommand::Del(values) => commands::del::invoke(storage, values),
     }
 }
 
