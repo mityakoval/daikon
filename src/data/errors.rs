@@ -3,6 +3,14 @@ use std::{num::ParseIntError, str::Utf8Error};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+pub(crate) enum DaikonError {
+    #[error(transparent)]
+    Parsing(#[from] ParsingError),
+    #[error(transparent)]
+    Storage(#[from] StorageError),
+}
+
+#[derive(Error, Debug)]
 pub enum ParsingError {
     #[error("command array ended unexpectedly")]
     IncompleteRequest,
@@ -18,8 +26,5 @@ pub enum ParsingError {
     UnknownCommand,
 }
 
-#[derive(Error, Debug)]
-pub(crate) enum DaikonError {
-    #[error(transparent)]
-    Parsing(#[from] ParsingError),
-}
+#[derive(Debug, Error)]
+pub enum StorageError {}

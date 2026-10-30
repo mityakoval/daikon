@@ -7,15 +7,18 @@ pub(crate) const LP_SEPARATOR: &str = "/r/n";
 pub(crate) const LP_MAX_SIZE: usize = 10;
 
 #[derive(Debug, Clone)]
-pub struct ListPack {
-    pub size: u8,
+pub(crate) struct ListPack {
+    pub size: usize,
     pub data: Bytes,
 }
 
 #[derive(Debug, Clone)]
-pub enum RedisData {
+pub(crate) enum RedisData {
     String(Bytes),
-    List(VecDeque<ListPack>),
+    List {
+        packs: VecDeque<ListPack>,
+        length: usize,
+    },
 }
 
 impl RedisData {
@@ -27,4 +30,16 @@ impl RedisData {
             _ => RespValue::Err("".into()),
         }
     }
+}
+
+pub(crate) struct ListPosition {
+    pack: usize,
+    item: usize,
+}
+
+pub(crate) fn list_index_to_list_pack_index(
+    i: i16,
+    list: &VecDeque<ListPack>,
+) -> Option<ListPosition> {
+    list
 }

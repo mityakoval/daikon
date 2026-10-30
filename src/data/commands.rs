@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug)]
-pub(crate) enum Kommand {
+pub(crate) enum Command {
     Ping,
     Echo(RespValue),
     Set {
@@ -21,21 +21,31 @@ pub(crate) enum Kommand {
         key: Arc<str>,
         values: VecDeque<RespValue>,
     },
+    Lrange {
+        key: Arc<str>,
+        start: i16,
+        stop: i16,
+    },
 }
 
-impl Display for Kommand {
+impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            Kommand::Ping => CommandName::Ping.fmt(f),
-            Kommand::Echo(_) => CommandName::Echo.fmt(f),
-            Kommand::Set {
+        match self {
+            Command::Ping => CommandName::Ping.fmt(f),
+            Command::Echo(_) => CommandName::Echo.fmt(f),
+            Command::Set {
                 key: _,
                 value: _,
                 ttl: _,
             } => CommandName::Set.fmt(f),
-            Kommand::Get(_) => CommandName::Get.fmt(f),
-            Kommand::Del(_) => CommandName::Del.fmt(f),
-            Kommand::Rpush { key: _, values: _ } => CommandName::Rpush.fmt(f),
+            Command::Get(_) => CommandName::Get.fmt(f),
+            Command::Del(_) => CommandName::Del.fmt(f),
+            Command::Rpush { key: _, values: _ } => CommandName::Rpush.fmt(f),
+            Command::Lrange {
+                key: _,
+                start: _,
+                stop: _,
+            } => CommandName::Lrange.fmt(f),
         }
     }
 }
@@ -48,6 +58,7 @@ pub enum CommandName {
     Get,
     Del,
     Rpush,
+    Lrange,
 }
 impl FromStr for CommandName {
     type Err = ParsingError;

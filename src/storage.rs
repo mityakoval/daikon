@@ -9,6 +9,22 @@ pub struct Storage {
 
 impl Storage {
     pub(crate) fn get_live(&mut self, key: &str) -> Option<&StoredValue> {
+        if !self.remove_if_expired(key) {
+            self.data.get(key)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn get_mut_live(&mut self, key: &str) -> Option<&mut StoredValue> {
+        if !self.remove_if_expired(key) {
+            self.data.get_mut(key)
+        } else {
+            None
+        }
+    }
+
+    fn remove_if_expired(&mut self, key: &str) -> bool {
         let expired = self
             .expiry
             .get(key)
@@ -18,9 +34,7 @@ impl Storage {
             self.data.remove(key);
             self.expiry.remove(key);
             debug!("Removed {:?}", key);
-            None
-        } else {
-            self.data.get(key)
         }
+        expired
     }
 }

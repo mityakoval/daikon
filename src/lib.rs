@@ -1,4 +1,4 @@
-use crate::data::commands::Kommand;
+use crate::data::commands::Command;
 use crate::data::errors::ParsingError;
 use crate::data::resp_types::{RespType, RespValue};
 use crate::parser::commands::parse_command_array;
@@ -72,14 +72,15 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
     }
 }
 
-fn execute_command(command: Kommand, storage: &DbMutex) -> anyhow::Result<RespValue> {
+fn execute_command(command: Command, storage: &DbMutex) -> anyhow::Result<RespValue> {
     match command {
-        Kommand::Ping => Ok(commands::ping::invoke()),
-        Kommand::Echo(value) => commands::echo::invoke(value),
-        Kommand::Set { key, value, ttl } => commands::set::invoke(storage, key, value, ttl),
-        Kommand::Get(key) => commands::get::invoke(storage, key),
-        Kommand::Rpush { key, mut values } => commands::rpush::invoke(storage, key, &mut values),
-        Kommand::Del(values) => commands::del::invoke(storage, values),
+        Command::Ping => Ok(commands::ping::invoke()),
+        Command::Echo(value) => commands::echo::invoke(value),
+        Command::Set { key, value, ttl } => commands::set::invoke(storage, key, value, ttl),
+        Command::Get(key) => commands::get::invoke(storage, key),
+        Command::Rpush { key, mut values } => commands::rpush::invoke(storage, key, &mut values),
+        Command::Del(values) => commands::del::invoke(storage, values),
+        Command::Lrange { key, start, stop } => commands::lrange::invoke(storage, key, start, stop),
     }
 }
 

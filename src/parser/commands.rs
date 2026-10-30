@@ -1,5 +1,5 @@
+use crate::data::commands::Command;
 use crate::data::commands::CommandName::{self};
-use crate::data::commands::Kommand;
 use crate::data::errors::ParsingError::{self, InvalidCommand, MalformedRequest};
 use crate::data::resp_types::RespValue;
 use crate::parser::input::parse_data_bytes;
@@ -9,9 +9,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub(crate) fn parse_command_array(input: &BytesMut) -> Result<Kommand, ParsingError> {
-    match parse_data_bytes(input.iter().as_slice())?.unwrap() {
-        (RespValue::Array(mut command_array), _) => {
+pub(crate) fn parse_command_array(input: &BytesMut) -> Result<Command, ParsingError> {
+    match parse_data_bytes(input.iter().as_slice())? {
+        Some((RespValue::Array(mut command_array), _)) => {
             trace!("Parsed array: {:?}", command_array);
 
             if let Some(RespValue::BulkString(command_bulk_str)) = command_array.pop_front() {
@@ -19,34 +19,46 @@ pub(crate) fn parse_command_array(input: &BytesMut) -> Result<Kommand, ParsingEr
                 match command_name {
                     CommandName::Ping => {
                         require_empty(command_array, command_name)?;
-                        Ok(Kommand::Ping)
+                        Ok(Command::Ping)
                     }
                     CommandName::Echo => {
-                        let value = command_array.pop_back().unwrap();
+                        let value = parse_value(command_array.pop_back())?;
                         require_empty(command_array, command_name)?;
-                        Ok(Kommand::Echo(value))
+                        Ok(Command::Echo(value))
                     }
                     CommandName::Set => {
                         let ttl = parse_ttl(&mut command_array)?;
-                        let key = parse_key(command_array.pop_front().unwrap())?;
-                        let value = command_array.pop_back().unwrap();
+                        let key = parse_key(command_array.pop_front())?;
+                        let value = parse_value(command_array.pop_back())?;
                         require_empty(command_array, command_name)?;
-                        Ok(Kommand::Set { key, value, ttl })
+                        Ok(Command::Set { key, value, ttl })
                     }
                     CommandName::Get => {
-                        let key = parse_key(command_array.pop_front().unwrap())?;
+                        let key = parse_key(command_array.pop_front())?;
                         require_empty(command_array, command_name)?;
-                        Ok(Kommand::Get(key))
+                        Ok(Command::Get(key))
                     }
                     CommandName::Del => {
                         let keys = parse_keys(&mut command_array)?;
                         require_empty(command_array, command_name)?;
-                        Ok(Kommand::Del(keys))
+                        Ok(Command::Del(keys))
                     }
                     CommandName::Rpush => {
-                        let key = parse_key(command_array.pop_front().unwrap())?;
+                        let key = parse_key(command_array.pop_front())?;
+                        if command_array.is_empty() {
+                            return Err(ParsingError::MalformedRequest);
+                        }
                         let values = command_array;
-                        Ok(Kommand::Rpush { key, values })
+                        Ok(Command::Rpush { key, values })
+                    }
+                    CommandName::Lrange => {
+                        let key = parse_key(command_array.pop_front())?;
+                        let start = parse_index(command_array.pop_front())?;
+                        let stop = parse_index(command_array.pop_front())?;
+                        if stop < start {
+                            return Err(ParsingError::MalformedRequest);
+                        }
+                        Ok(Command::Lrange { key, start, stop })
                     }
                 }
             } else {
@@ -57,8 +69,24 @@ pub(crate) fn parse_command_array(input: &BytesMut) -> Result<Kommand, ParsingEr
     }
 }
 
-fn parse_key(key: RespValue) -> Result<Arc<str>, ParsingError> {
-    if let RespValue::BulkString(key) = key {
+fn parse_value(value: Option<RespValue>) -> Result<RespValue, ParsingError> {
+    if let Some(value) = value {
+        Ok(value)
+    } else {
+        Err(ParsingError::MalformedRequest)
+    }
+}
+
+fn parse_index(value: Option<RespValue>) -> Result<i16, ParsingError> {
+    if let Some(RespValue::BulkString(value)) = value {
+        Ok(value.parse::<i16>()?)
+    } else {
+        Err(MalformedRequest)
+    }
+}
+
+fn parse_key(key: Option<RespValue>) -> Result<Arc<str>, ParsingError> {
+    if let Some(RespValue::BulkString(key)) = key {
         Ok(Arc::<str>::from(key.to_owned()))
     } else {
         Err(MalformedRequest)
