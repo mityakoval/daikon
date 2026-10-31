@@ -48,8 +48,19 @@ pub(crate) fn parse_command_array(input: &BytesMut) -> Result<Command, ParsingEr
                         if command_array.is_empty() {
                             return Err(ParsingError::MalformedRequest);
                         }
-                        let values = command_array;
-                        Ok(Command::Rpush { key, values })
+                        let values: Result<VecDeque<String>, ParsingError> = command_array
+                            .into_iter()
+                            .map(|value| {
+                                let RespValue::BulkString(val) = value else {
+                                    return Err(ParsingError::MalformedRequest);
+                                };
+                                Ok(val)
+                            })
+                            .collect();
+                        Ok(Command::Rpush {
+                            key,
+                            values: values?,
+                        })
                     }
                     CommandName::Lrange => {
                         let key = parse_key(command_array.pop_front())?;

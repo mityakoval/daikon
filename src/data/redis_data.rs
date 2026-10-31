@@ -1,7 +1,7 @@
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use std::collections::VecDeque;
 
-use crate::data::resp_types::RespValue;
+use crate::data::{errors::StorageError, resp_types::RespValue};
 
 pub(crate) const LP_SEPARATOR: &str = "/r/n";
 pub(crate) const LP_MAX_SIZE: usize = 10;
@@ -9,7 +9,22 @@ pub(crate) const LP_MAX_SIZE: usize = 10;
 #[derive(Debug, Clone)]
 pub(crate) struct ListPack {
     pub size: usize,
-    pub data: Bytes,
+    pub data: BytesMut,
+}
+
+impl ListPack {
+    pub(crate) fn push(&mut self, value: String) -> Result<(), StorageError> {
+        if self.size < LP_MAX_SIZE {
+            self.data.extend_from_slice(&value.into_bytes());
+            if LP_MAX_SIZE - self.size != 1 {
+                self.data.extend_from_slice(LP_SEPARATOR.as_bytes());
+            };
+            self.size += 1;
+            Ok(())
+        } else {
+            Err(StorageError::ListPackFull)
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

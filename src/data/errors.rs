@@ -27,4 +27,7 @@ pub enum ParsingError {
 }
 
 #[derive(Debug, Error)]
-pub enum StorageError {}
+pub enum StorageError {
+    #[error("list pack full")]
+    ListPackFull,
+}

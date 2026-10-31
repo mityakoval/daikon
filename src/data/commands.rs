@@ -19,7 +19,7 @@ pub(crate) enum Command {
     Del(Vec<Arc<str>>),
     Rpush {
         key: Arc<str>,
-        values: VecDeque<RespValue>,
+        values: VecDeque<String>,
     },
     Lrange {
         key: Arc<str>,
