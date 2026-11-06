@@ -1,7 +1,5 @@
 use std::{cmp, collections::VecDeque, sync::Arc};
 
-use bytes::BytesMut;
-
 use crate::{
     DbMutex,
     data::{
@@ -9,58 +7,69 @@ use crate::{
         resp_types::{RespValue, StoredValue},
     },
 };
+use anyhow::anyhow;
+use bytes::BytesMut;
 
 pub(crate) fn invoke(
     storage_mut: &DbMutex,
     key: Arc<str>,
     values: &mut VecDeque<String>,
 ) -> anyhow::Result<RespValue> {
-    let mut inserted: i64 = 0;
     if let Ok(mut storage) = storage_mut.lock() {
         if let Some(stored_value) = storage.get_mut_live(&key) {
-            if let RedisData::List { packs, length: _ } = &mut stored_value.value {
+            if let RedisData::List { packs, length } = &mut stored_value.value {
                 if let Some(last_pack) = packs.back_mut() {
                     let remaining_space = LP_MAX_SIZE - last_pack.size;
-                    for string in values.drain(..remaining_space) {
+                    let until = cmp::min(values.len(), remaining_space);
+                    for string in values.drain(..until) {
                         last_pack.push(string);
-                        inserted += 1;
+                        *length += 1;
                     }
                 }
+                let inserted = pack(packs, values);
+                *length += inserted;
+                return Ok(RespValue::Integer(*length as i64));
+            } else {
+                return Err(anyhow!("WRONTYPE"));
             }
-        }
-
-        /*
-         * NEXT TODO:: When a list already exists, insert the pack into it and don't create a new
-         * StoredValue
-         */
-
-        let len = values.len();
-        let r = len % LP_MAX_SIZE;
-        let mut packs = len / LP_MAX_SIZE;
-        if r != 0 {
-            packs += 1;
-        }
-        let list: VecDeque<ListPack> = VecDeque::with_capacity(packs);
-        for _ in 0..packs {
-            let until = cmp::min(len, LP_MAX_SIZE);
-            let mut pack = ListPack {
-                size: 0,
-                data: BytesMut::new(),
-            };
-            for string in values.drain(..until) {
-                pack.push(string);
-            }
-        }
-        storage.data.insert(
-            key,
-            StoredValue {
-                value: RedisData::List {
-                    length: len,
-                    packs: list,
+        } else {
+            let mut list = VecDeque::new();
+            let inserted = pack(&mut list, values);
+            storage.data.insert(
+                key,
+                StoredValue {
+                    value: RedisData::List {
+                        length: inserted,
+                        packs: list,
+                    },
                 },
-            },
-        );
+            );
+            return Ok(RespValue::Integer(inserted as i64));
+        }
     }
+    Err(anyhow!("Inaccessible storage"))
+}
 
-    Ok(RespValue::Integer(inserted as i64))
+fn pack(list: &mut VecDeque<ListPack>, values: &mut VecDeque<String>) -> usize {
+    let mut inserted: usize = 0;
+    let len = values.len();
+    let r = len % LP_MAX_SIZE;
+    let mut new_packs = len / LP_MAX_SIZE;
+    if r != 0 {
+        new_packs += 1;
+    }
+    list.reserve(new_packs);
+    for _ in 0..new_packs {
+        let until = cmp::min(values.len(), LP_MAX_SIZE);
+        let mut pack = ListPack {
+            size: 0,
+            data: BytesMut::new(),
+        };
+        for string in values.drain(..until) {
+            pack.push(string);
+            inserted += 1;
+        }
+        list.push_back(pack);
+    }
+    inserted
 }
