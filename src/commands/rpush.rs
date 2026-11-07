@@ -8,12 +8,12 @@ use crate::{
     },
 };
 use anyhow::anyhow;
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 
 pub(crate) fn invoke(
     storage_mut: &DbMutex,
     key: Arc<str>,
-    values: &mut VecDeque<String>,
+    values: &mut VecDeque<Bytes>,
 ) -> anyhow::Result<RespValue> {
     if let Ok(mut storage) = storage_mut.lock() {
         if let Some(stored_value) = storage.get_mut_live(&key) {
@@ -50,14 +50,13 @@ pub(crate) fn invoke(
     Err(anyhow!("Inaccessible storage"))
 }
 
-fn pack(list: &mut VecDeque<ListPack>, values: &mut VecDeque<String>) -> usize {
+fn pack(
+    list: &mut VecDeque<ListPack>,
+    values: &mut VecDeque<Bytes>,
+) -> Result<usize, StorageError> {
     let mut inserted: usize = 0;
     let len = values.len();
-    let r = len % LP_MAX_SIZE;
-    let mut new_packs = len / LP_MAX_SIZE;
-    if r != 0 {
-        new_packs += 1;
-    }
+    let new_packs = len.div_ceil(LP_MAX_SIZE);
     list.reserve(new_packs);
     for _ in 0..new_packs {
         let until = cmp::min(values.len(), LP_MAX_SIZE);
@@ -72,4 +71,15 @@ fn pack(list: &mut VecDeque<ListPack>, values: &mut VecDeque<String>) -> usize {
         list.push_back(pack);
     }
     inserted
+}
+
+#[cfg(test)]
+
+mod test {
+    use crate::commands::rpush::pack;
+
+    #[test]
+    fn pack_works_when_there_is_space_in_listpack() {
+        pack(list, values)
+    }
 }

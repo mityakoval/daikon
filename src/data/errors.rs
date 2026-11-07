@@ -26,8 +26,12 @@ pub enum ParsingError {
     UnknownCommand,
 }
 
+pub(crate) type ParsingResult<T> = Result<T, ParsingError>;
+
 #[derive(Debug, Error)]
 pub enum StorageError {
     #[error("list pack full")]
     ListPackFull,
 }
+
+pub(crate) type StorageResult<T> = Result<T, StorageError>;

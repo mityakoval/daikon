@@ -1,3 +1,5 @@
+use bytes::Bytes;
+
 use crate::data::errors::ParsingError;
 use crate::data::resp_types::RespValue;
 use std::collections::VecDeque;
@@ -19,7 +21,7 @@ pub(crate) enum Command {
     Del(Vec<Arc<str>>),
     Rpush {
         key: Arc<str>,
-        values: VecDeque<String>,
+        values: VecDeque<Bytes>,
     },
     Lrange {
         key: Arc<str>,

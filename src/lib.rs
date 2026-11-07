@@ -1,5 +1,5 @@
 use crate::data::commands::Command;
-use crate::data::errors::ParsingError;
+use crate::data::errors::{ParsingError, StorageError};
 use crate::data::resp_types::{RespType, RespValue};
 use crate::parser::commands::parse_command_array;
 use crate::storage::Storage;
@@ -72,7 +72,7 @@ pub async fn handle_connection(mut stream: TcpStream, db_mutex: DbMutex) {
     }
 }
 
-fn execute_command(command: Command, storage: &DbMutex) -> anyhow::Result<RespValue> {
+fn execute_command(command: Command, storage: &DbMutex) -> Result<RespValue, StorageError> {
     match command {
         Command::Ping => Ok(commands::ping::invoke()),
         Command::Echo(value) => commands::echo::invoke(value),

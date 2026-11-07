@@ -3,7 +3,7 @@ use crate::data::commands::CommandName::{self};
 use crate::data::errors::ParsingError::{self, InvalidCommand, MalformedRequest};
 use crate::data::resp_types::RespValue;
 use crate::parser::input::parse_data_bytes;
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -48,13 +48,13 @@ pub(crate) fn parse_command_array(input: &BytesMut) -> Result<Command, ParsingEr
                         if command_array.is_empty() {
                             return Err(ParsingError::MalformedRequest);
                         }
-                        let values: Result<VecDeque<String>, ParsingError> = command_array
+                        let values: Result<VecDeque<Bytes>, ParsingError> = command_array
                             .into_iter()
                             .map(|value| {
                                 let RespValue::BulkString(val) = value else {
                                     return Err(ParsingError::MalformedRequest);
                                 };
-                                Ok(val)
+                                Ok(Bytes::from(val))
                             })
                             .collect();
                         Ok(Command::Rpush {

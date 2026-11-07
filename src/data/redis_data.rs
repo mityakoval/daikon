@@ -3,7 +3,6 @@ use std::collections::VecDeque;
 
 use crate::data::{errors::StorageError, resp_types::RespValue};
 
-pub(crate) const LP_SEPARATOR: &str = "/r/n";
 pub(crate) const LP_MAX_SIZE: usize = 10;
 
 #[derive(Debug, Clone)]
@@ -13,12 +12,12 @@ pub(crate) struct ListPack {
 }
 
 impl ListPack {
-    pub(crate) fn push(&mut self, value: String) -> Result<(), StorageError> {
+    pub(crate) fn push(&mut self, value: Bytes) -> Result<(), StorageError> {
         if self.size < LP_MAX_SIZE {
-            self.data.extend_from_slice(&value.into_bytes());
-            if LP_MAX_SIZE - self.size != 1 {
-                self.data.extend_from_slice(LP_SEPARATOR.as_bytes());
-            };
+            let len_bytes = &(value.len() as u32).to_le_bytes();
+            self.data.extend_from_slice(len_bytes);
+            self.data.extend_from_slice(&value);
+            self.data.extend_from_slice(len_bytes);
             self.size += 1;
             Ok(())
         } else {
@@ -52,9 +51,9 @@ pub(crate) struct ListPosition {
     item: usize,
 }
 
-pub(crate) fn list_index_to_list_pack_index(
-    i: i16,
-    list: &VecDeque<ListPack>,
-) -> Option<ListPosition> {
-    list
-}
+//pub(crate) fn list_index_to_list_pack_index(
+//    i: i16,
+//    list: &VecDeque<ListPack>,
+//) -> Option<ListPosition> {
+//    list
+//}
