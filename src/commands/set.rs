@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 
+use crate::data::errors::StorageResult;
 use crate::data::redis_data::RedisData;
 use crate::data::resp_types::RespValue::{self, Err, SimpleString};
 use crate::{DbMutex, data::resp_types::StoredValue};
@@ -12,7 +13,7 @@ pub(crate) fn invoke(
     key: Arc<str>,
     value: RespValue,
     ttl: Option<Duration>,
-) -> anyhow::Result<RespValue> {
+) -> StorageResult<RespValue> {
     let RespValue::BulkString(value) = value else {
         return Ok(Err("Value cannot be stored".into()));
     };

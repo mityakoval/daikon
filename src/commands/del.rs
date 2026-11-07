@@ -1,8 +1,11 @@
 use std::{ops::Add, sync::Arc};
 
-use crate::{DbMutex, data::resp_types::RespValue};
+use crate::{
+    DbMutex,
+    data::{errors::StorageResult, resp_types::RespValue},
+};
 
-pub(crate) fn invoke(storage_mutex: &DbMutex, keys: Vec<Arc<str>>) -> anyhow::Result<RespValue> {
+pub(crate) fn invoke(storage_mutex: &DbMutex, keys: Vec<Arc<str>>) -> StorageResult<RespValue> {
     if let Ok(mut storage) = storage_mutex.lock() {
         let removed = keys.iter().fold(0i64, |acc, k| {
             if storage.get_live(k).is_some() {

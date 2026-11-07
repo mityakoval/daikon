@@ -32,6 +32,10 @@ pub(crate) type ParsingResult<T> = Result<T, ParsingError>;
 pub enum StorageError {
     #[error("list pack full")]
     ListPackFull,
+    #[error("WRONGTYPE")]
+    WrongType,
+    #[error("inaccessible storage")]
+    InaccessibleStorage,
 }
 
 pub(crate) type StorageResult<T> = Result<T, StorageError>;

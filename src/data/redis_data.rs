@@ -1,7 +1,10 @@
 use bytes::{Bytes, BytesMut};
 use std::collections::VecDeque;
 
-use crate::data::{errors::StorageError, resp_types::RespValue};
+use crate::data::{
+    errors::{StorageError, StorageResult},
+    resp_types::RespValue,
+};
 
 pub(crate) const LP_MAX_SIZE: usize = 10;
 
@@ -12,7 +15,7 @@ pub(crate) struct ListPack {
 }
 
 impl ListPack {
-    pub(crate) fn push(&mut self, value: Bytes) -> Result<(), StorageError> {
+    pub(crate) fn push(&mut self, value: Bytes) -> StorageResult<()> {
         if self.size < LP_MAX_SIZE {
             let len_bytes = &(value.len() as u32).to_le_bytes();
             self.data.extend_from_slice(len_bytes);

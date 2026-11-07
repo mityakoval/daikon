@@ -3,6 +3,7 @@ use std::{collections::VecDeque, sync::Arc};
 use crate::{
     DbMutex,
     data::{
+        errors::{StorageError, StorageResult},
         redis_data::{LP_MAX_SIZE, RedisData},
         resp_types::RespValue,
     },
@@ -14,8 +15,8 @@ pub(crate) fn invoke(
     key: Arc<str>,
     start: i16,
     stop: i16,
-) -> anyhow::Result<RespValue> {
-    Err(anyhow!("NOT IMPLEMENTED"))
+) -> StorageResult<RespValue> {
+    Err(StorageError::InaccessibleStorage)
     //if let Ok(mut storage) = storage_mutex.lock() {
     //    if let Some(stored_value) = storage.get_live(&key) {
     //        let RedisData::List(list_packs) = &stored_value.value else {

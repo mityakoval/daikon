@@ -1,5 +1,3 @@
-use anyhow::Ok;
-
 use crate::data::{
     errors::StorageResult,
     resp_types::RespValue::{self, Err},
