@@ -72,11 +72,22 @@ fn pack(list: &mut VecDeque<ListPack>, values: &mut VecDeque<Bytes>) -> StorageR
 
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
+    use std::{
+        collections::{HashMap, VecDeque},
+        panic,
+        sync::{Arc, Mutex},
+    };
 
     use bytes::Bytes;
 
-    use crate::{commands::rpush::pack, data::redis_data::ListPack};
+    use crate::{
+        commands::rpush::{invoke, pack},
+        data::{
+            redis_data::{ListPack, RedisData},
+            resp_types::{RespValue, StoredValue},
+        },
+        storage::Storage,
+    };
 
     #[test]
     fn pack_works() {
@@ -110,5 +121,53 @@ mod test {
         assert_eq!(inserted, size);
         let last_listpack = list.back().expect("expected a ListPack");
         assert_eq!(last_listpack.size, 3);
+    }
+
+    #[test]
+    fn rpush_adds_items_to_the_list() {
+        let storage_mutex = Arc::new(Mutex::new(Storage {
+            data: HashMap::new(),
+            expiry: HashMap::new(),
+        }));
+        let key = Arc::<str>::from("key");
+
+        let size = 33;
+        let mut values = VecDeque::with_capacity(size);
+        for n in 0..size {
+            values.push_back(Bytes::from(n.to_string()));
+        }
+
+        let inserted = invoke(&storage_mutex, Arc::clone(&key), &mut values)
+            .expect("expected number of inserted items");
+        let RespValue::Integer(n) = inserted else {
+            panic!("expected RespValue::Integer");
+        };
+
+        assert_eq!(n as usize, size);
+        let add_size = 7;
+
+        for n in 0..add_size {
+            values.push_back(Bytes::from(n.to_string()));
+        }
+
+        let inserted = invoke(&storage_mutex, Arc::clone(&key), &mut values)
+            .expect("expected number of inserted items");
+        let RespValue::Integer(n) = inserted else {
+            panic!("expected RespValue::Integer");
+        };
+        assert_eq!(n as usize, size + add_size);
+
+        let Ok(mut storage) = storage_mutex.lock() else {
+            panic!("couldn't obtain storage lock");
+        };
+
+        let Some(StoredValue {
+            value: RedisData::List { packs, length },
+        }) = storage.get_live(&key)
+        else {
+            panic!("expected stored value");
+        };
+        assert_eq!(*length, size + add_size);
+        assert_eq!(packs.len(), 4);
     }
 }
