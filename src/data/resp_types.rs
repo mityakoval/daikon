@@ -20,7 +20,7 @@ pub enum RespValue {
 
 #[derive(Debug)]
 pub struct StoredValue {
-    pub value: RedisData,
+    pub(crate) value: RedisData,
 }
 
 impl RespType for RespValue {

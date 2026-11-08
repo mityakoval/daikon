@@ -1,6 +1,7 @@
 use crate::data::commands::Command;
 use crate::data::commands::CommandName::{self};
 use crate::data::errors::ParsingError::{self, InvalidCommand, MalformedRequest};
+use crate::data::errors::ParsingResult;
 use crate::data::resp_types::RespValue;
 use crate::parser::input::parse_data_bytes;
 use bytes::{Bytes, BytesMut};
@@ -9,7 +10,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub(crate) fn parse_command_array(input: &BytesMut) -> Result<Command, ParsingError> {
+pub(crate) fn parse_command_array(input: &BytesMut) -> ParsingResult<Command> {
     match parse_data_bytes(input.iter().as_slice())? {
         Some((RespValue::Array(mut command_array), _)) => {
             trace!("Parsed array: {:?}", command_array);
@@ -80,7 +81,7 @@ pub(crate) fn parse_command_array(input: &BytesMut) -> Result<Command, ParsingEr
     }
 }
 
-fn parse_value(value: Option<RespValue>) -> Result<RespValue, ParsingError> {
+fn parse_value(value: Option<RespValue>) -> ParsingResult<RespValue> {
     if let Some(value) = value {
         Ok(value)
     } else {
@@ -88,7 +89,7 @@ fn parse_value(value: Option<RespValue>) -> Result<RespValue, ParsingError> {
     }
 }
 
-fn parse_index(value: Option<RespValue>) -> Result<i16, ParsingError> {
+fn parse_index(value: Option<RespValue>) -> ParsingResult<i16> {
     if let Some(RespValue::BulkString(value)) = value {
         Ok(value.parse::<i16>()?)
     } else {
@@ -96,7 +97,7 @@ fn parse_index(value: Option<RespValue>) -> Result<i16, ParsingError> {
     }
 }
 
-fn parse_key(key: Option<RespValue>) -> Result<Arc<str>, ParsingError> {
+fn parse_key(key: Option<RespValue>) -> ParsingResult<Arc<str>> {
     if let Some(RespValue::BulkString(key)) = key {
         Ok(Arc::<str>::from(key.to_owned()))
     } else {
@@ -104,7 +105,7 @@ fn parse_key(key: Option<RespValue>) -> Result<Arc<str>, ParsingError> {
     }
 }
 
-fn parse_keys(command_array: &mut VecDeque<RespValue>) -> Result<Vec<Arc<str>>, ParsingError> {
+fn parse_keys(command_array: &mut VecDeque<RespValue>) -> ParsingResult<Vec<Arc<str>>> {
     let mut keys = Vec::with_capacity(command_array.len());
     while let Some(v) = command_array.pop_front() {
         let RespValue::BulkString(key) = v else {
@@ -115,7 +116,7 @@ fn parse_keys(command_array: &mut VecDeque<RespValue>) -> Result<Vec<Arc<str>>, 
     Ok(keys)
 }
 
-fn parse_ttl(array: &mut VecDeque<RespValue>) -> Result<Option<Duration>, ParsingError> {
+fn parse_ttl(array: &mut VecDeque<RespValue>) -> ParsingResult<Option<Duration>> {
     let rem_len = array.len();
     if rem_len < 2 {
         return Ok(None);
@@ -153,10 +154,7 @@ fn parse_ttl(array: &mut VecDeque<RespValue>) -> Result<Option<Duration>, Parsin
     }
 }
 
-fn require_empty(
-    array: VecDeque<RespValue>,
-    command_name: CommandName,
-) -> Result<(), ParsingError> {
+fn require_empty(array: VecDeque<RespValue>, command_name: CommandName) -> ParsingResult<()> {
     if !array.is_empty() {
         return Err(ParsingError::InvalidCommand(format!(
             "wrong number of arguments for '{}' command",

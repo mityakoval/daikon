@@ -1,11 +1,14 @@
 use std::collections::VecDeque;
 
 use crate::data::{
-    errors::ParsingError::{self, IncompleteRequest, MalformedRequest},
+    errors::{
+        ParsingError::{self, IncompleteRequest, MalformedRequest},
+        ParsingResult,
+    },
     resp_types::RespValue,
 };
 
-pub fn parse_data_bytes(bytes: &[u8]) -> Result<Option<(RespValue, &[u8])>, ParsingError> {
+pub fn parse_data_bytes(bytes: &[u8]) -> ParsingResult<Option<(RespValue, &[u8])>> {
     let Some((sep_start, next_chunk_at)) = next_resp_separator(bytes)? else {
         return Ok(None);
     };
@@ -84,7 +87,7 @@ pub fn parse_data_bytes(bytes: &[u8]) -> Result<Option<(RespValue, &[u8])>, Pars
     }
 }
 
-fn next_resp_separator(bytes: &[u8]) -> Result<Option<(usize, usize)>, ParsingError> {
+fn next_resp_separator(bytes: &[u8]) -> ParsingResult<Option<(usize, usize)>> {
     trace!("\ngetting next chunk from: {:?}", str::from_utf8(bytes));
     let Some(sep_start) = bytes.iter().position(|&x| x == b'\r') else {
         return Ok(None);
