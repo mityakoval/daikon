@@ -1,14 +1,10 @@
-use std::{collections::VecDeque, sync::Arc};
+use std::{collections::VecDeque, ops::Div, sync::Arc};
 
 use crate::{
-    DbMutex,
-    data::{
-        errors::{StorageError, StorageResult},
-        redis_data::{LP_MAX_SIZE, RedisData},
-        resp_types::RespValue,
+    DbMutex, data::{
+        errors::{StorageError, StorageResult}, redis_data::{LP_MAX_SIZE, RedisData, RedisListIter, list_index_to_list_pack_index}, resp_types::RespValue,
     },
 };
-use anyhow::anyhow;
 
 pub(crate) fn invoke(
     storage_mutex: &DbMutex,
@@ -16,30 +12,35 @@ pub(crate) fn invoke(
     start: i16,
     stop: i16,
 ) -> StorageResult<RespValue> {
-    Err(StorageError::InaccessibleStorage)
-    //if let Ok(mut storage) = storage_mutex.lock() {
-    //    if let Some(stored_value) = storage.get_live(&key) {
-    //        let RedisData::List(list_packs) = &stored_value.value else {
-    //            return Err(anyhow!("Wrong type"));
-    //        };
+    if let Ok(mut storage) = storage_mutex.lock() {
+        if let Some(stored_value) = storage.get_live(&key) {
+            let RedisData::List { packs, length } = &stored_value.value else {
+                return Err(StorageError::WrongType);
+            };
 
-    //        let result = VecDeque::new();
-    //        if list_packs.is_empty() {
-    //            return Ok(RespValue::Array(result));
-    //        };
-    //        let list_len = (LP_MAX_SIZE * (list_packs.len() - 1))
-    //            + list_packs.back().map_or(0, |pack| pack.size as usize);
-    //        let from: usize = if start < 0 {
-    //            list_packs.len() - (start.abs() as usize)
-    //        } else {
-    //            start as usize
-    //        };
+            let result = VecDeque::new();
+            if packs.is_empty() {
+                return Ok(RespValue::Array(result));
+            };
+            let from: usize = if start < 0 {
+                *length - (start.unsigned_abs() as usize)
+            } else {
+                start as usize
+            };
 
-    //        let to: usize = if start < 0 {
-    //            list_packs.len() - (stop.abs() as usize)
-    //        } else {
-    //            stop as usize
-    //        };
-    //    }
-    //}
+            let from = list_index_to_list_pack_index(from, packs);
+
+            let to: usize = if start < 0 {
+                *length - (stop.unsigned_abs() as usize)
+            } else {
+                stop as usize
+            };
+            let to = list_index_to_list_pack_index(to, packs);
+
+            let res = RedisListIter::new()
+        };
+    } else {
+        return Err(StorageError::InaccessibleStorage);
+    }
+    Ok(RespValue::NullBulkString())
 }

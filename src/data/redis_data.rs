@@ -27,6 +27,10 @@ impl ListPack {
             Err(StorageError::ListPackFull)
         }
     }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &u8> {
+        self.data.iter()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -49,14 +53,36 @@ impl RedisData {
     }
 }
 
+pub(crate) struct RedisListIter<'a> {
+    packs: &'a VecDeque<ListPack>,
+    length: &'a usize,
+    byte_offset: usize,
+    item_offset: usize,
+}
+
+impl<'a> RedisListIter<'a> {
+    pub(crate) fn new(packs: &'a VecDeque<ListPack>, length: &'a usize) -> Self {
+        RedisListIter {
+            packs,
+            length,
+            byte_offset: 0,
+            item_offset: 0,
+        }
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &u8> {
+        self.packs.iter().flat_map(ListPack::iter)
+    }
+}
+
 pub(crate) struct ListPosition {
     pack: usize,
     item: usize,
 }
 
-//pub(crate) fn list_index_to_list_pack_index(
-//    i: i16,
-//    list: &VecDeque<ListPack>,
-//) -> Option<ListPosition> {
-//    list
-//}
+pub(crate) fn list_index_to_list_pack_index(i: usize, list: &VecDeque<ListPack>) -> ListPosition {
+    ListPosition {
+        pack: i / list.len(),
+        item: i % list.len(),
+    }
+}

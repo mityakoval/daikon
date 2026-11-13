@@ -9,12 +9,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug)]
-pub(crate) enum Command {
+pub(crate) enum Command<'a> {
     Ping,
-    Echo(RespValue),
+    Echo(RespValue<'a>),
     Set {
         key: Arc<str>,
-        value: RespValue,
+        value: RespValue<'a>,
         ttl: Option<Duration>,
     },
     Get(Arc<str>),
@@ -30,7 +30,7 @@ pub(crate) enum Command {
     },
 }
 
-impl Display for Command {
+impl<'a> Display for Command<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Command::Ping => CommandName::Ping.fmt(f),

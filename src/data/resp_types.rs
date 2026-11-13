@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::data::redis_data::RedisData;
 
@@ -12,7 +12,7 @@ pub trait RespType {
 pub enum RespValue {
     Array(VecDeque<RespValue>),
     SimpleString(String),
-    BulkString(String),
+    BulkString(Bytes),
     Integer(i64),
     NullBulkString(),
     Err(String),
@@ -23,7 +23,7 @@ pub struct StoredValue {
     pub(crate) value: RedisData,
 }
 
-impl RespType for RespValue {
+impl<'a> RespType for RespValue {
     fn encode(&mut self) -> BytesMut {
         let mut encoded: BytesMut = BytesMut::new();
         match self {
@@ -40,7 +40,9 @@ impl RespType for RespValue {
                 encoded.extend_from_slice(format!("+{}\r\n", value).as_bytes());
             }
             RespValue::BulkString(value) => {
-                encoded.extend_from_slice(format!("${}\r\n{}\r\n", value.len(), value).as_bytes());
+                encoded.extend_from_slice(format!("${}\r\n", value.len()).as_bytes());
+                encoded.extend_from_slice(&value.to_vec());
+                encoded.extend_from_slice("\r\n".as_bytes());
             }
             RespValue::Integer(value) => {
                 encoded.extend_from_slice(format!(":{}\r\n", value).as_bytes());

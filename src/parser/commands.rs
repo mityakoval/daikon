@@ -91,27 +91,27 @@ fn parse_value(value: Option<RespValue>) -> ParsingResult<RespValue> {
 
 fn parse_index(value: Option<RespValue>) -> ParsingResult<i16> {
     if let Some(RespValue::BulkString(value)) = value {
-        Ok(value.parse::<i16>()?)
+        Ok(std::str::from_utf8(&value)?.parse()?)
     } else {
         Err(MalformedRequest)
     }
 }
 
-fn parse_key(key: Option<RespValue>) -> ParsingResult<Arc<str>> {
+fn parse_key(key: Option<RespValue>) -> ParsingResult<Bytes> {
     if let Some(RespValue::BulkString(key)) = key {
-        Ok(Arc::<str>::from(key.to_owned()))
+        Ok(key)
     } else {
         Err(MalformedRequest)
     }
 }
 
-fn parse_keys(command_array: &mut VecDeque<RespValue>) -> ParsingResult<Vec<Arc<str>>> {
+fn parse_keys(command_array: &mut VecDeque<RespValue>) -> ParsingResult<Vec<Bytes>> {
     let mut keys = Vec::with_capacity(command_array.len());
     while let Some(v) = command_array.pop_front() {
         let RespValue::BulkString(key) = v else {
             return Err(MalformedRequest);
         };
-        keys.push(Arc::<str>::from(key.to_owned()));
+        keys.push(key);
     }
     Ok(keys)
 }

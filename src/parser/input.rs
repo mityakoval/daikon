@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use bytes::Bytes;
+
 use crate::data::{
     errors::{
         ParsingError::{self, IncompleteRequest, MalformedRequest},
@@ -30,22 +32,14 @@ pub fn parse_data_bytes(bytes: &[u8]) -> ParsingResult<Option<(RespValue, &[u8])
                     return Err(ParsingError::IncompleteRequest);
                 }
 
-                let potential_chunk = &rest[..length];
+                let content = Bytes::copy_from_slice(&rest[..length]);
 
-                if potential_chunk.contains(&b'\r') {
-                    trace!(
-                        "chunk contains a separator: {:?}",
-                        str::from_utf8(potential_chunk)
-                    );
+                if content.contains(&b'\r') {
+                    trace!("chunk contains a separator: {:?}", content);
                     return Err(ParsingError::MalformedRequest);
                 }
 
-                let content = str::from_utf8(potential_chunk)?.to_string();
-                trace!(
-                    "got bulk string {:?} of length: {}",
-                    content.as_str(),
-                    length
-                );
+                trace!("got bulk string {:?} of length: {}", content, length);
                 Ok(Some((
                     RespValue::BulkString(content),
                     &rest[(length + 2)..],
@@ -180,6 +174,6 @@ mod tests {
         };
 
         assert_eq!(vec.len(), 8);
-        assert_eq!(vec[0], RespValue::BulkString("rpush".to_string()));
+        assert_eq!(vec[0], RespValue::BulkString(Bytes::from_static(b"rpush")));
     }
 }
